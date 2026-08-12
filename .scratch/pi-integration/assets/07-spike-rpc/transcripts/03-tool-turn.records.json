@@ -1,0 +1,1120 @@
+[
+  {
+    "at": "2026-08-12T22:56:31.849Z",
+    "raw": "{\"id\":\"ticket07-03-tool-turn-1\",\"type\":\"response\",\"command\":\"prompt\",\"success\":true}",
+    "json": {
+      "id": "ticket07-03-tool-turn-1",
+      "type": "response",
+      "command": "prompt",
+      "success": true
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:31.849Z",
+    "raw": "{\"type\":\"agent_start\"}",
+    "json": {
+      "type": "agent_start"
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:31.849Z",
+    "raw": "{\"type\":\"turn_start\"}",
+    "json": {
+      "type": "turn_start"
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:31.849Z",
+    "raw": "{\"type\":\"message_start\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"You must call the built-in read tool exactly once to read /home/vinicius/workspace/t3-com-pi/.scratch/pi-integration/assets/07-spike-rpc/fixtures/read-target.txt. After it returns, answer exactly with the marker contained in that file and nothing else.\"}],\"timestamp\":1786575391847}}",
+    "json": {
+      "type": "message_start",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "You must call the built-in read tool exactly once to read /home/vinicius/workspace/t3-com-pi/.scratch/pi-integration/assets/07-spike-rpc/fixtures/read-target.txt. After it returns, answer exactly with the marker contained in that file and nothing else."
+          }
+        ],
+        "timestamp": 1786575391847
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:31.850Z",
+    "raw": "{\"type\":\"message_end\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"You must call the built-in read tool exactly once to read /home/vinicius/workspace/t3-com-pi/.scratch/pi-integration/assets/07-spike-rpc/fixtures/read-target.txt. After it returns, answer exactly with the marker contained in that file and nothing else.\"}],\"timestamp\":1786575391847}}",
+    "json": {
+      "type": "message_end",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "You must call the built-in read tool exactly once to read /home/vinicius/workspace/t3-com-pi/.scratch/pi-integration/assets/07-spike-rpc/fixtures/read-target.txt. After it returns, answer exactly with the marker contained in that file and nothing else."
+          }
+        ],
+        "timestamp": 1786575391847
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:32.508Z",
+    "raw": "{\"type\":\"message_start\",\"message\":{\"role\":\"assistant\",\"content\":[],\"api\":\"openai-codex-responses\",\"provider\":\"openai-codex\",\"model\":\"gpt-5.6-luna\",\"usage\":{\"input\":0,\"output\":0,\"cacheRead\":0,\"cacheWrite\":0,\"totalTokens\":0,\"cost\":{\"input\":0,\"output\":0,\"cacheRead\":0,\"cacheWrite\":0,\"total\":0}},\"stopReason\":\"pending\",\"timestamp\":1786575391860}}",
+    "json": {
+      "type": "message_start",
+      "message": {
+        "role": "assistant",
+        "content": [],
+        "api": "openai-codex-responses",
+        "provider": "openai-codex",
+        "model": "gpt-5.6-luna",
+        "usage": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "totalTokens": 0,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        },
+        "stopReason": "pending",
+        "timestamp": 1786575391860
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:32.966Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"thinking_start\",\"contentIndex\":0}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "thinking_start",
+        "contentIndex": 0
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.030Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"thinking_delta\",\"contentIndex\":0,\"delta\":\"**Ensuring single file read call**\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "thinking_delta",
+        "contentIndex": 0,
+        "delta": "**Ensuring single file read call**"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.031Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"thinking_delta\",\"contentIndex\":0,\"delta\":\"\\n\\n\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "thinking_delta",
+        "contentIndex": 0,
+        "delta": "\n\n"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.031Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"thinking_end\",\"contentIndex\":0,\"content\":\"**Ensuring single file read call**\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "thinking_end",
+        "contentIndex": 0,
+        "content": "**Ensuring single file read call**"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.032Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_start\",\"contentIndex\":1}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_start",
+        "contentIndex": 1
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.033Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"{\\\"\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "{\""
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.033Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"path\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "path"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.036Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"\\\":\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "\":"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.036Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"\\\"/\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "\"/"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.037Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"home\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "home"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.041Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"/v\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "/v"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.041Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"in\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "in"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.043Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"ici\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "ici"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.045Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"us\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "us"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.046Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"/work\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "/work"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.049Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"space\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "space"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.049Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"/t\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "/t"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.050Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"3\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "3"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.052Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"-com\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "-com"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.056Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"-p\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "-p"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.057Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"i\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "i"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.058Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"/.\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "/."
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.058Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"scratch\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "scratch"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.062Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"/pi\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "/pi"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.062Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"-in\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "-in"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.078Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"tegration\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "tegration"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.078Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"/assets\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "/assets"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.078Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"/\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "/"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.078Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"07\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "07"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.079Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"-sp\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "-sp"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.085Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"ike\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "ike"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.106Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"-r\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "-r"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.124Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"pc\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "pc"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.144Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"/\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "/"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.162Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"fixtures\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "fixtures"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.200Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"/read\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "/read"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.200Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"-target\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "-target"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.228Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\".txt\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": ".txt"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.237Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_delta\",\"contentIndex\":1,\"delta\":\"\\\"}\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "\"}"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.391Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"toolcall_end\",\"contentIndex\":1,\"toolCall\":{\"type\":\"toolCall\",\"id\":\"call_015GXsB1cA7iRSllmt5RR1bu|fc_00b9de980d45bfad016a7cfa2202008191931963c0203b57a6\",\"name\":\"read\",\"arguments\":{\"path\":\"/home/vinicius/workspace/t3-com-pi/.scratch/pi-integration/assets/07-spike-rpc/fixtures/read-target.txt\"}}}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "toolcall_end",
+        "contentIndex": 1,
+        "toolCall": {
+          "type": "toolCall",
+          "id": "call_015GXsB1cA7iRSllmt5RR1bu|fc_00b9de980d45bfad016a7cfa2202008191931963c0203b57a6",
+          "name": "read",
+          "arguments": {
+            "path": "/home/vinicius/workspace/t3-com-pi/.scratch/pi-integration/assets/07-spike-rpc/fixtures/read-target.txt"
+          }
+        }
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.406Z",
+    "raw": "{\"type\":\"message_end\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"**Ensuring single file read call**\",\"thinkingSignature\":\"{\\\"id\\\":\\\"rs_00b9de980d45bfad016a7cfa20f2c88191927407a3a6aa4705\\\",\\\"type\\\":\\\"reasoning\\\",\\\"content\\\":[],\\\"encrypted_content\\\":\\\"gAAAAABqfPoiC4mOvxL8NSVtYFqAU8Lcf8gWAcnCBmscn1z8-o21m8ajBcG4fMAxbVk5GRHd6503IqfDded0rogl4AVkYwCMTT62HrbWfXbsNampnYk1E_a53Ez29DUQi5RJZgBfoxS8CcRNXoFq3gtHCNrv_UXMrLB9SCb_84zkKwQRFI-fmrLnz2j8XBSslVzMQnjUe22G-583w1mLv3WXgvWnu1-UIG9TN1KYQG0hlXhQqLNiH53bOOT_nQqdoTBjbjTjPkmoCSY3l6ckb2C8S-okN59vrQ25Kgclssk7mXqajvM6HAP39Is2sKJjMac1biE3NFD_Kf5Y9DHbVJgf7U_adKbvPMg5yhrStNefgpQ2UZg0fz72dJ7ubAKlp0sygDDkFq-lD9F9RNEVitpbOoSdqbQ21BmHGbgQCm91ccGuqkQ0MX7rH5XD9fhZiFaQHCkScYgw8sK6fxR_AD-5vaiZvUFtNyXcbE16wWf7EeJx6ITxv5lpwa9OTHaZlzOZJ-_SkPrh903hHcU6DEkdW09pS5XrbDdhmC5fsOwgIUskuRQFGFqgdPfXVWkxI8-TD7Tsz-r1n13esWBnthSt2w5f7MRDAwSDybfoMb0c_OdrX60t7ygeRrbfKG9pG8lXIulqF-XK9zG-e_DNrWRVroI9rd-f8ueXTi5_SpN2WO7zVxPMIf3hIG9z1K5AELxx_dWPmpf3Y_8eW_wwx2LZ60200GUDh6cuerae4tzFDOzU5fGp5Le2x_rcmGAj1CP9pUy8rgvO-DYszwwOPGA2KQiAwTTsHaSxJ1H_e-vfy9zAzsnOi2xoe3xcRrL9npVwFSc2EbkO329z9LkL99PBtq3_auaVr1dz5h7mfWzmEm5Wd8JI0WSWeBQeW5zBu01ZbNQEK3Gh52rjbcV3m5z8_7qYJFECMopZYy3hGFOoK7kwXv3C9l_xXuOA3T4bgZt_Qi4TqTns90IE2yQ-Wmyz4nQ-lEVgWFtuEikgATAv9ulFl9NhGk7dYX0AWAKiMgsujVzUOfhWkDukgbKCo3rdxNMoSpCslSv7tACI-F3klGZxYp9vaX972-Kgh2LeXSSgARqh1zYf\\\",\\\"summary\\\":[{\\\"type\\\":\\\"summary_text\\\",\\\"text\\\":\\\"**Ensuring single file read call**\\\"}]}\"},{\"type\":\"toolCall\",\"id\":\"call_015GXsB1cA7iRSllmt5RR1bu|fc_00b9de980d45bfad016a7cfa2202008191931963c0203b57a6\",\"name\":\"read\",\"arguments\":{\"path\":\"/home/vinicius/workspace/t3-com-pi/.scratch/pi-integration/assets/07-spike-rpc/fixtures/read-target.txt\"}}],\"api\":\"openai-codex-responses\",\"provider\":\"openai-codex\",\"model\":\"gpt-5.6-luna\",\"usage\":{\"input\":3627,\"output\":75,\"cacheRead\":0,\"cacheWrite\":0,\"reasoning\":27,\"totalTokens\":3702,\"cost\":{\"input\":0.0007254000000000001,\"output\":0.00008999999999999999,\"cacheRead\":0,\"cacheWrite\":0,\"total\":0.0008154000000000001}},\"stopReason\":\"toolUse\",\"timestamp\":1786575391860,\"responseId\":\"resp_00b9de980d45bfad016a7cfa2083ac8191ae1fc7cc6868d900\",\"rawStopReason\":\"completed\"}}",
+    "json": {
+      "type": "message_end",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "thinking",
+            "thinking": "**Ensuring single file read call**",
+            "thinkingSignature": "{\"id\":\"rs_00b9de980d45bfad016a7cfa20f2c88191927407a3a6aa4705\",\"type\":\"reasoning\",\"content\":[],\"encrypted_content\":\"gAAAAABqfPoiC4mOvxL8NSVtYFqAU8Lcf8gWAcnCBmscn1z8-o21m8ajBcG4fMAxbVk5GRHd6503IqfDded0rogl4AVkYwCMTT62HrbWfXbsNampnYk1E_a53Ez29DUQi5RJZgBfoxS8CcRNXoFq3gtHCNrv_UXMrLB9SCb_84zkKwQRFI-fmrLnz2j8XBSslVzMQnjUe22G-583w1mLv3WXgvWnu1-UIG9TN1KYQG0hlXhQqLNiH53bOOT_nQqdoTBjbjTjPkmoCSY3l6ckb2C8S-okN59vrQ25Kgclssk7mXqajvM6HAP39Is2sKJjMac1biE3NFD_Kf5Y9DHbVJgf7U_adKbvPMg5yhrStNefgpQ2UZg0fz72dJ7ubAKlp0sygDDkFq-lD9F9RNEVitpbOoSdqbQ21BmHGbgQCm91ccGuqkQ0MX7rH5XD9fhZiFaQHCkScYgw8sK6fxR_AD-5vaiZvUFtNyXcbE16wWf7EeJx6ITxv5lpwa9OTHaZlzOZJ-_SkPrh903hHcU6DEkdW09pS5XrbDdhmC5fsOwgIUskuRQFGFqgdPfXVWkxI8-TD7Tsz-r1n13esWBnthSt2w5f7MRDAwSDybfoMb0c_OdrX60t7ygeRrbfKG9pG8lXIulqF-XK9zG-e_DNrWRVroI9rd-f8ueXTi5_SpN2WO7zVxPMIf3hIG9z1K5AELxx_dWPmpf3Y_8eW_wwx2LZ60200GUDh6cuerae4tzFDOzU5fGp5Le2x_rcmGAj1CP9pUy8rgvO-DYszwwOPGA2KQiAwTTsHaSxJ1H_e-vfy9zAzsnOi2xoe3xcRrL9npVwFSc2EbkO329z9LkL99PBtq3_auaVr1dz5h7mfWzmEm5Wd8JI0WSWeBQeW5zBu01ZbNQEK3Gh52rjbcV3m5z8_7qYJFECMopZYy3hGFOoK7kwXv3C9l_xXuOA3T4bgZt_Qi4TqTns90IE2yQ-Wmyz4nQ-lEVgWFtuEikgATAv9ulFl9NhGk7dYX0AWAKiMgsujVzUOfhWkDukgbKCo3rdxNMoSpCslSv7tACI-F3klGZxYp9vaX972-Kgh2LeXSSgARqh1zYf\",\"summary\":[{\"type\":\"summary_text\",\"text\":\"**Ensuring single file read call**\"}]}"
+          },
+          {
+            "type": "toolCall",
+            "id": "call_015GXsB1cA7iRSllmt5RR1bu|fc_00b9de980d45bfad016a7cfa2202008191931963c0203b57a6",
+            "name": "read",
+            "arguments": {
+              "path": "/home/vinicius/workspace/t3-com-pi/.scratch/pi-integration/assets/07-spike-rpc/fixtures/read-target.txt"
+            }
+          }
+        ],
+        "api": "openai-codex-responses",
+        "provider": "openai-codex",
+        "model": "gpt-5.6-luna",
+        "usage": {
+          "input": 3627,
+          "output": 75,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reasoning": 27,
+          "totalTokens": 3702,
+          "cost": {
+            "input": 0.0007254000000000001,
+            "output": 0.00008999999999999999,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0.0008154000000000001
+          }
+        },
+        "stopReason": "toolUse",
+        "timestamp": 1786575391860,
+        "responseId": "resp_00b9de980d45bfad016a7cfa2083ac8191ae1fc7cc6868d900",
+        "rawStopReason": "completed"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.406Z",
+    "raw": "{\"type\":\"tool_execution_start\",\"toolCallId\":\"call_015GXsB1cA7iRSllmt5RR1bu|fc_00b9de980d45bfad016a7cfa2202008191931963c0203b57a6\",\"toolName\":\"read\",\"args\":{\"path\":\"/home/vinicius/workspace/t3-com-pi/.scratch/pi-integration/assets/07-spike-rpc/fixtures/read-target.txt\"}}",
+    "json": {
+      "type": "tool_execution_start",
+      "toolCallId": "call_015GXsB1cA7iRSllmt5RR1bu|fc_00b9de980d45bfad016a7cfa2202008191931963c0203b57a6",
+      "toolName": "read",
+      "args": {
+        "path": "/home/vinicius/workspace/t3-com-pi/.scratch/pi-integration/assets/07-spike-rpc/fixtures/read-target.txt"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.411Z",
+    "raw": "{\"type\":\"tool_execution_end\",\"toolCallId\":\"call_015GXsB1cA7iRSllmt5RR1bu|fc_00b9de980d45bfad016a7cfa2202008191931963c0203b57a6\",\"toolName\":\"read\",\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"SPI_TOOL_READ_OK\\n\"}]},\"isError\":false}",
+    "json": {
+      "type": "tool_execution_end",
+      "toolCallId": "call_015GXsB1cA7iRSllmt5RR1bu|fc_00b9de980d45bfad016a7cfa2202008191931963c0203b57a6",
+      "toolName": "read",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "SPI_TOOL_READ_OK\n"
+          }
+        ]
+      },
+      "isError": false
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.411Z",
+    "raw": "{\"type\":\"message_start\",\"message\":{\"role\":\"toolResult\",\"toolCallId\":\"call_015GXsB1cA7iRSllmt5RR1bu|fc_00b9de980d45bfad016a7cfa2202008191931963c0203b57a6\",\"toolName\":\"read\",\"content\":[{\"type\":\"text\",\"text\":\"SPI_TOOL_READ_OK\\n\"}],\"isError\":false,\"timestamp\":1786575394411}}",
+    "json": {
+      "type": "message_start",
+      "message": {
+        "role": "toolResult",
+        "toolCallId": "call_015GXsB1cA7iRSllmt5RR1bu|fc_00b9de980d45bfad016a7cfa2202008191931963c0203b57a6",
+        "toolName": "read",
+        "content": [
+          {
+            "type": "text",
+            "text": "SPI_TOOL_READ_OK\n"
+          }
+        ],
+        "isError": false,
+        "timestamp": 1786575394411
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.411Z",
+    "raw": "{\"type\":\"message_end\",\"message\":{\"role\":\"toolResult\",\"toolCallId\":\"call_015GXsB1cA7iRSllmt5RR1bu|fc_00b9de980d45bfad016a7cfa2202008191931963c0203b57a6\",\"toolName\":\"read\",\"content\":[{\"type\":\"text\",\"text\":\"SPI_TOOL_READ_OK\\n\"}],\"isError\":false,\"timestamp\":1786575394411}}",
+    "json": {
+      "type": "message_end",
+      "message": {
+        "role": "toolResult",
+        "toolCallId": "call_015GXsB1cA7iRSllmt5RR1bu|fc_00b9de980d45bfad016a7cfa2202008191931963c0203b57a6",
+        "toolName": "read",
+        "content": [
+          {
+            "type": "text",
+            "text": "SPI_TOOL_READ_OK\n"
+          }
+        ],
+        "isError": false,
+        "timestamp": 1786575394411
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.412Z",
+    "raw": "{\"type\":\"turn_end\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"**Ensuring single file read call**\",\"thinkingSignature\":\"{\\\"id\\\":\\\"rs_00b9de980d45bfad016a7cfa20f2c88191927407a3a6aa4705\\\",\\\"type\\\":\\\"reasoning\\\",\\\"content\\\":[],\\\"encrypted_content\\\":\\\"gAAAAABqfPoiC4mOvxL8NSVtYFqAU8Lcf8gWAcnCBmscn1z8-o21m8ajBcG4fMAxbVk5GRHd6503IqfDded0rogl4AVkYwCMTT62HrbWfXbsNampnYk1E_a53Ez29DUQi5RJZgBfoxS8CcRNXoFq3gtHCNrv_UXMrLB9SCb_84zkKwQRFI-fmrLnz2j8XBSslVzMQnjUe22G-583w1mLv3WXgvWnu1-UIG9TN1KYQG0hlXhQqLNiH53bOOT_nQqdoTBjbjTjPkmoCSY3l6ckb2C8S-okN59vrQ25Kgclssk7mXqajvM6HAP39Is2sKJjMac1biE3NFD_Kf5Y9DHbVJgf7U_adKbvPMg5yhrStNefgpQ2UZg0fz72dJ7ubAKlp0sygDDkFq-lD9F9RNEVitpbOoSdqbQ21BmHGbgQCm91ccGuqkQ0MX7rH5XD9fhZiFaQHCkScYgw8sK6fxR_AD-5vaiZvUFtNyXcbE16wWf7EeJx6ITxv5lpwa9OTHaZlzOZJ-_SkPrh903hHcU6DEkdW09pS5XrbDdhmC5fsOwgIUskuRQFGFqgdPfXVWkxI8-TD7Tsz-r1n13esWBnthSt2w5f7MRDAwSDybfoMb0c_OdrX60t7ygeRrbfKG9pG8lXIulqF-XK9zG-e_DNrWRVroI9rd-f8ueXTi5_SpN2WO7zVxPMIf3hIG9z1K5AELxx_dWPmpf3Y_8eW_wwx2LZ60200GUDh6cuerae4tzFDOzU5fGp5Le2x_rcmGAj1CP9pUy8rgvO-DYszwwOPGA2KQiAwTTsHaSxJ1H_e-vfy9zAzsnOi2xoe3xcRrL9npVwFSc2EbkO329z9LkL99PBtq3_auaVr1dz5h7mfWzmEm5Wd8JI0WSWeBQeW5zBu01ZbNQEK3Gh52rjbcV3m5z8_7qYJFECMopZYy3hGFOoK7kwXv3C9l_xXuOA3T4bgZt_Qi4TqTns90IE2yQ-Wmyz4nQ-lEVgWFtuEikgATAv9ulFl9NhGk7dYX0AWAKiMgsujVzUOfhWkDukgbKCo3rdxNMoSpCslSv7tACI-F3klGZxYp9vaX972-Kgh2LeXSSgARqh1zYf\\\",\\\"summary\\\":[{\\\"type\\\":\\\"summary_text\\\",\\\"text\\\":\\\"**Ensuring single file read call**\\\"}]}\"},{\"type\":\"toolCall\",\"id\":\"call_015GXsB1cA7iRSllmt5RR1bu|fc_00b9de980d45bfad016a7cfa2202008191931963c0203b57a6\",\"name\":\"read\",\"arguments\":{\"path\":\"/home/vinicius/workspace/t3-com-pi/.scratch/pi-integration/assets/07-spike-rpc/fixtures/read-target.txt\"}}],\"api\":\"openai-codex-responses\",\"provider\":\"openai-codex\",\"model\":\"gpt-5.6-luna\",\"usage\":{\"input\":3627,\"output\":75,\"cacheRead\":0,\"cacheWrite\":0,\"reasoning\":27,\"totalTokens\":3702,\"cost\":{\"input\":0.0007254000000000001,\"output\":0.00008999999999999999,\"cacheRead\":0,\"cacheWrite\":0,\"total\":0.0008154000000000001}},\"stopReason\":\"toolUse\",\"timestamp\":1786575391860,\"responseId\":\"resp_00b9de980d45bfad016a7cfa2083ac8191ae1fc7cc6868d900\",\"rawStopReason\":\"completed\"},\"toolResults\":[{\"role\":\"toolResult\",\"toolCallId\":\"call_015GXsB1cA7iRSllmt5RR1bu|fc_00b9de980d45bfad016a7cfa2202008191931963c0203b57a6\",\"toolName\":\"read\",\"content\":[{\"type\":\"text\",\"text\":\"SPI_TOOL_READ_OK\\n\"}],\"isError\":false,\"timestamp\":1786575394411}]}",
+    "json": {
+      "type": "turn_end",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "thinking",
+            "thinking": "**Ensuring single file read call**",
+            "thinkingSignature": "{\"id\":\"rs_00b9de980d45bfad016a7cfa20f2c88191927407a3a6aa4705\",\"type\":\"reasoning\",\"content\":[],\"encrypted_content\":\"gAAAAABqfPoiC4mOvxL8NSVtYFqAU8Lcf8gWAcnCBmscn1z8-o21m8ajBcG4fMAxbVk5GRHd6503IqfDded0rogl4AVkYwCMTT62HrbWfXbsNampnYk1E_a53Ez29DUQi5RJZgBfoxS8CcRNXoFq3gtHCNrv_UXMrLB9SCb_84zkKwQRFI-fmrLnz2j8XBSslVzMQnjUe22G-583w1mLv3WXgvWnu1-UIG9TN1KYQG0hlXhQqLNiH53bOOT_nQqdoTBjbjTjPkmoCSY3l6ckb2C8S-okN59vrQ25Kgclssk7mXqajvM6HAP39Is2sKJjMac1biE3NFD_Kf5Y9DHbVJgf7U_adKbvPMg5yhrStNefgpQ2UZg0fz72dJ7ubAKlp0sygDDkFq-lD9F9RNEVitpbOoSdqbQ21BmHGbgQCm91ccGuqkQ0MX7rH5XD9fhZiFaQHCkScYgw8sK6fxR_AD-5vaiZvUFtNyXcbE16wWf7EeJx6ITxv5lpwa9OTHaZlzOZJ-_SkPrh903hHcU6DEkdW09pS5XrbDdhmC5fsOwgIUskuRQFGFqgdPfXVWkxI8-TD7Tsz-r1n13esWBnthSt2w5f7MRDAwSDybfoMb0c_OdrX60t7ygeRrbfKG9pG8lXIulqF-XK9zG-e_DNrWRVroI9rd-f8ueXTi5_SpN2WO7zVxPMIf3hIG9z1K5AELxx_dWPmpf3Y_8eW_wwx2LZ60200GUDh6cuerae4tzFDOzU5fGp5Le2x_rcmGAj1CP9pUy8rgvO-DYszwwOPGA2KQiAwTTsHaSxJ1H_e-vfy9zAzsnOi2xoe3xcRrL9npVwFSc2EbkO329z9LkL99PBtq3_auaVr1dz5h7mfWzmEm5Wd8JI0WSWeBQeW5zBu01ZbNQEK3Gh52rjbcV3m5z8_7qYJFECMopZYy3hGFOoK7kwXv3C9l_xXuOA3T4bgZt_Qi4TqTns90IE2yQ-Wmyz4nQ-lEVgWFtuEikgATAv9ulFl9NhGk7dYX0AWAKiMgsujVzUOfhWkDukgbKCo3rdxNMoSpCslSv7tACI-F3klGZxYp9vaX972-Kgh2LeXSSgARqh1zYf\",\"summary\":[{\"type\":\"summary_text\",\"text\":\"**Ensuring single file read call**\"}]}"
+          },
+          {
+            "type": "toolCall",
+            "id": "call_015GXsB1cA7iRSllmt5RR1bu|fc_00b9de980d45bfad016a7cfa2202008191931963c0203b57a6",
+            "name": "read",
+            "arguments": {
+              "path": "/home/vinicius/workspace/t3-com-pi/.scratch/pi-integration/assets/07-spike-rpc/fixtures/read-target.txt"
+            }
+          }
+        ],
+        "api": "openai-codex-responses",
+        "provider": "openai-codex",
+        "model": "gpt-5.6-luna",
+        "usage": {
+          "input": 3627,
+          "output": 75,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reasoning": 27,
+          "totalTokens": 3702,
+          "cost": {
+            "input": 0.0007254000000000001,
+            "output": 0.00008999999999999999,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0.0008154000000000001
+          }
+        },
+        "stopReason": "toolUse",
+        "timestamp": 1786575391860,
+        "responseId": "resp_00b9de980d45bfad016a7cfa2083ac8191ae1fc7cc6868d900",
+        "rawStopReason": "completed"
+      },
+      "toolResults": [
+        {
+          "role": "toolResult",
+          "toolCallId": "call_015GXsB1cA7iRSllmt5RR1bu|fc_00b9de980d45bfad016a7cfa2202008191931963c0203b57a6",
+          "toolName": "read",
+          "content": [
+            {
+              "type": "text",
+              "text": "SPI_TOOL_READ_OK\n"
+            }
+          ],
+          "isError": false,
+          "timestamp": 1786575394411
+        }
+      ]
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.412Z",
+    "raw": "{\"type\":\"turn_start\"}",
+    "json": {
+      "type": "turn_start"
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:34.814Z",
+    "raw": "{\"type\":\"message_start\",\"message\":{\"role\":\"assistant\",\"content\":[],\"api\":\"openai-codex-responses\",\"provider\":\"openai-codex\",\"model\":\"gpt-5.6-luna\",\"usage\":{\"input\":0,\"output\":0,\"cacheRead\":0,\"cacheWrite\":0,\"totalTokens\":0,\"cost\":{\"input\":0,\"output\":0,\"cacheRead\":0,\"cacheWrite\":0,\"total\":0}},\"stopReason\":\"pending\",\"timestamp\":1786575394412}}",
+    "json": {
+      "type": "message_start",
+      "message": {
+        "role": "assistant",
+        "content": [],
+        "api": "openai-codex-responses",
+        "provider": "openai-codex",
+        "model": "gpt-5.6-luna",
+        "usage": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "totalTokens": 0,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        },
+        "stopReason": "pending",
+        "timestamp": 1786575394412
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:35.154Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"text_start\",\"contentIndex\":0}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "text_start",
+        "contentIndex": 0
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:35.174Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"text_delta\",\"contentIndex\":0,\"delta\":\"SPI\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "text_delta",
+        "contentIndex": 0,
+        "delta": "SPI"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:35.196Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"text_delta\",\"contentIndex\":0,\"delta\":\"_TOOL\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "text_delta",
+        "contentIndex": 0,
+        "delta": "_TOOL"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:35.211Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"text_delta\",\"contentIndex\":0,\"delta\":\"_READ\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "text_delta",
+        "contentIndex": 0,
+        "delta": "_READ"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:35.211Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"text_delta\",\"contentIndex\":0,\"delta\":\"_OK\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "text_delta",
+        "contentIndex": 0,
+        "delta": "_OK"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:35.343Z",
+    "raw": "{\"type\":\"message_update\",\"assistantMessageEvent\":{\"type\":\"text_end\",\"contentIndex\":0,\"content\":\"SPI_TOOL_READ_OK\"}}",
+    "json": {
+      "type": "message_update",
+      "assistantMessageEvent": {
+        "type": "text_end",
+        "contentIndex": 0,
+        "content": "SPI_TOOL_READ_OK"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:35.385Z",
+    "raw": "{\"type\":\"message_end\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"SPI_TOOL_READ_OK\",\"textSignature\":\"{\\\"v\\\":1,\\\"id\\\":\\\"msg_00b9de980d45bfad016a7cfa2323888191bc66a28120d6fa0f\\\",\\\"phase\\\":\\\"final_answer\\\"}\"}],\"api\":\"openai-codex-responses\",\"provider\":\"openai-codex\",\"model\":\"gpt-5.6-luna\",\"usage\":{\"input\":1157,\"output\":8,\"cacheRead\":2560,\"cacheWrite\":0,\"reasoning\":0,\"totalTokens\":3725,\"cost\":{\"input\":0.00023140000000000001,\"output\":0.0000096,\"cacheRead\":0.0000512,\"cacheWrite\":0,\"total\":0.0002922}},\"stopReason\":\"stop\",\"timestamp\":1786575394412,\"responseId\":\"resp_00b9de980d45bfad016a7cfa22d0a481919be90643f10cb577\",\"rawStopReason\":\"completed\"}}",
+    "json": {
+      "type": "message_end",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "SPI_TOOL_READ_OK",
+            "textSignature": "{\"v\":1,\"id\":\"msg_00b9de980d45bfad016a7cfa2323888191bc66a28120d6fa0f\",\"phase\":\"final_answer\"}"
+          }
+        ],
+        "api": "openai-codex-responses",
+        "provider": "openai-codex",
+        "model": "gpt-5.6-luna",
+        "usage": {
+          "input": 1157,
+          "output": 8,
+          "cacheRead": 2560,
+          "cacheWrite": 0,
+          "reasoning": 0,
+          "totalTokens": 3725,
+          "cost": {
+            "input": 0.00023140000000000001,
+            "output": 0.0000096,
+            "cacheRead": 0.0000512,
+            "cacheWrite": 0,
+            "total": 0.0002922
+          }
+        },
+        "stopReason": "stop",
+        "timestamp": 1786575394412,
+        "responseId": "resp_00b9de980d45bfad016a7cfa22d0a481919be90643f10cb577",
+        "rawStopReason": "completed"
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:35.385Z",
+    "raw": "{\"type\":\"turn_end\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"SPI_TOOL_READ_OK\",\"textSignature\":\"{\\\"v\\\":1,\\\"id\\\":\\\"msg_00b9de980d45bfad016a7cfa2323888191bc66a28120d6fa0f\\\",\\\"phase\\\":\\\"final_answer\\\"}\"}],\"api\":\"openai-codex-responses\",\"provider\":\"openai-codex\",\"model\":\"gpt-5.6-luna\",\"usage\":{\"input\":1157,\"output\":8,\"cacheRead\":2560,\"cacheWrite\":0,\"reasoning\":0,\"totalTokens\":3725,\"cost\":{\"input\":0.00023140000000000001,\"output\":0.0000096,\"cacheRead\":0.0000512,\"cacheWrite\":0,\"total\":0.0002922}},\"stopReason\":\"stop\",\"timestamp\":1786575394412,\"responseId\":\"resp_00b9de980d45bfad016a7cfa22d0a481919be90643f10cb577\",\"rawStopReason\":\"completed\"},\"toolResults\":[]}",
+    "json": {
+      "type": "turn_end",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "SPI_TOOL_READ_OK",
+            "textSignature": "{\"v\":1,\"id\":\"msg_00b9de980d45bfad016a7cfa2323888191bc66a28120d6fa0f\",\"phase\":\"final_answer\"}"
+          }
+        ],
+        "api": "openai-codex-responses",
+        "provider": "openai-codex",
+        "model": "gpt-5.6-luna",
+        "usage": {
+          "input": 1157,
+          "output": 8,
+          "cacheRead": 2560,
+          "cacheWrite": 0,
+          "reasoning": 0,
+          "totalTokens": 3725,
+          "cost": {
+            "input": 0.00023140000000000001,
+            "output": 0.0000096,
+            "cacheRead": 0.0000512,
+            "cacheWrite": 0,
+            "total": 0.0002922
+          }
+        },
+        "stopReason": "stop",
+        "timestamp": 1786575394412,
+        "responseId": "resp_00b9de980d45bfad016a7cfa22d0a481919be90643f10cb577",
+        "rawStopReason": "completed"
+      },
+      "toolResults": []
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:35.386Z",
+    "raw": "{\"type\":\"agent_end\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"You must call the built-in read tool exactly once to read /home/vinicius/workspace/t3-com-pi/.scratch/pi-integration/assets/07-spike-rpc/fixtures/read-target.txt. After it returns, answer exactly with the marker contained in that file and nothing else.\"}],\"timestamp\":1786575391847},{\"role\":\"assistant\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"**Ensuring single file read call**\",\"thinkingSignature\":\"{\\\"id\\\":\\\"rs_00b9de980d45bfad016a7cfa20f2c88191927407a3a6aa4705\\\",\\\"type\\\":\\\"reasoning\\\",\\\"content\\\":[],\\\"encrypted_content\\\":\\\"gAAAAABqfPoiC4mOvxL8NSVtYFqAU8Lcf8gWAcnCBmscn1z8-o21m8ajBcG4fMAxbVk5GRHd6503IqfDded0rogl4AVkYwCMTT62HrbWfXbsNampnYk1E_a53Ez29DUQi5RJZgBfoxS8CcRNXoFq3gtHCNrv_UXMrLB9SCb_84zkKwQRFI-fmrLnz2j8XBSslVzMQnjUe22G-583w1mLv3WXgvWnu1-UIG9TN1KYQG0hlXhQqLNiH53bOOT_nQqdoTBjbjTjPkmoCSY3l6ckb2C8S-okN59vrQ25Kgclssk7mXqajvM6HAP39Is2sKJjMac1biE3NFD_Kf5Y9DHbVJgf7U_adKbvPMg5yhrStNefgpQ2UZg0fz72dJ7ubAKlp0sygDDkFq-lD9F9RNEVitpbOoSdqbQ21BmHGbgQCm91ccGuqkQ0MX7rH5XD9fhZiFaQHCkScYgw8sK6fxR_AD-5vaiZvUFtNyXcbE16wWf7EeJx6ITxv5lpwa9OTHaZlzOZJ-_SkPrh903hHcU6DEkdW09pS5XrbDdhmC5fsOwgIUskuRQFGFqgdPfXVWkxI8-TD7Tsz-r1n13esWBnthSt2w5f7MRDAwSDybfoMb0c_OdrX60t7ygeRrbfKG9pG8lXIulqF-XK9zG-e_DNrWRVroI9rd-f8ueXTi5_SpN2WO7zVxPMIf3hIG9z1K5AELxx_dWPmpf3Y_8eW_wwx2LZ60200GUDh6cuerae4tzFDOzU5fGp5Le2x_rcmGAj1CP9pUy8rgvO-DYszwwOPGA2KQiAwTTsHaSxJ1H_e-vfy9zAzsnOi2xoe3xcRrL9npVwFSc2EbkO329z9LkL99PBtq3_auaVr1dz5h7mfWzmEm5Wd8JI0WSWeBQeW5zBu01ZbNQEK3Gh52rjbcV3m5z8_7qYJFECMopZYy3hGFOoK7kwXv3C9l_xXuOA3T4bgZt_Qi4TqTns90IE2yQ-Wmyz4nQ-lEVgWFtuEikgATAv9ulFl9NhGk7dYX0AWAKiMgsujVzUOfhWkDukgbKCo3rdxNMoSpCslSv7tACI-F3klGZxYp9vaX972-Kgh2LeXSSgARqh1zYf\\\",\\\"summary\\\":[{\\\"type\\\":\\\"summary_text\\\",\\\"text\\\":\\\"**Ensuring single file read call**\\\"}]}\"},{\"type\":\"toolCall\",\"id\":\"call_015GXsB1cA7iRSllmt5RR1bu|fc_00b9de980d45bfad016a7cfa2202008191931963c0203b57a6\",\"name\":\"read\",\"arguments\":{\"path\":\"/home/vinicius/workspace/t3-com-pi/.scratch/pi-integration/assets/07-spike-rpc/fixtures/read-target.txt\"}}],\"api\":\"openai-codex-responses\",\"provider\":\"openai-codex\",\"model\":\"gpt-5.6-luna\",\"usage\":{\"input\":3627,\"output\":75,\"cacheRead\":0,\"cacheWrite\":0,\"reasoning\":27,\"totalTokens\":3702,\"cost\":{\"input\":0.0007254000000000001,\"output\":0.00008999999999999999,\"cacheRead\":0,\"cacheWrite\":0,\"total\":0.0008154000000000001}},\"stopReason\":\"toolUse\",\"timestamp\":1786575391860,\"responseId\":\"resp_00b9de980d45bfad016a7cfa2083ac8191ae1fc7cc6868d900\",\"rawStopReason\":\"completed\"},{\"role\":\"toolResult\",\"toolCallId\":\"call_015GXsB1cA7iRSllmt5RR1bu|fc_00b9de980d45bfad016a7cfa2202008191931963c0203b57a6\",\"toolName\":\"read\",\"content\":[{\"type\":\"text\",\"text\":\"SPI_TOOL_READ_OK\\n\"}],\"isError\":false,\"timestamp\":1786575394411},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"SPI_TOOL_READ_OK\",\"textSignature\":\"{\\\"v\\\":1,\\\"id\\\":\\\"msg_00b9de980d45bfad016a7cfa2323888191bc66a28120d6fa0f\\\",\\\"phase\\\":\\\"final_answer\\\"}\"}],\"api\":\"openai-codex-responses\",\"provider\":\"openai-codex\",\"model\":\"gpt-5.6-luna\",\"usage\":{\"input\":1157,\"output\":8,\"cacheRead\":2560,\"cacheWrite\":0,\"reasoning\":0,\"totalTokens\":3725,\"cost\":{\"input\":0.00023140000000000001,\"output\":0.0000096,\"cacheRead\":0.0000512,\"cacheWrite\":0,\"total\":0.0002922}},\"stopReason\":\"stop\",\"timestamp\":1786575394412,\"responseId\":\"resp_00b9de980d45bfad016a7cfa22d0a481919be90643f10cb577\",\"rawStopReason\":\"completed\"}],\"willRetry\":false}",
+    "json": {
+      "type": "agent_end",
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "You must call the built-in read tool exactly once to read /home/vinicius/workspace/t3-com-pi/.scratch/pi-integration/assets/07-spike-rpc/fixtures/read-target.txt. After it returns, answer exactly with the marker contained in that file and nothing else."
+            }
+          ],
+          "timestamp": 1786575391847
+        },
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "**Ensuring single file read call**",
+              "thinkingSignature": "{\"id\":\"rs_00b9de980d45bfad016a7cfa20f2c88191927407a3a6aa4705\",\"type\":\"reasoning\",\"content\":[],\"encrypted_content\":\"gAAAAABqfPoiC4mOvxL8NSVtYFqAU8Lcf8gWAcnCBmscn1z8-o21m8ajBcG4fMAxbVk5GRHd6503IqfDded0rogl4AVkYwCMTT62HrbWfXbsNampnYk1E_a53Ez29DUQi5RJZgBfoxS8CcRNXoFq3gtHCNrv_UXMrLB9SCb_84zkKwQRFI-fmrLnz2j8XBSslVzMQnjUe22G-583w1mLv3WXgvWnu1-UIG9TN1KYQG0hlXhQqLNiH53bOOT_nQqdoTBjbjTjPkmoCSY3l6ckb2C8S-okN59vrQ25Kgclssk7mXqajvM6HAP39Is2sKJjMac1biE3NFD_Kf5Y9DHbVJgf7U_adKbvPMg5yhrStNefgpQ2UZg0fz72dJ7ubAKlp0sygDDkFq-lD9F9RNEVitpbOoSdqbQ21BmHGbgQCm91ccGuqkQ0MX7rH5XD9fhZiFaQHCkScYgw8sK6fxR_AD-5vaiZvUFtNyXcbE16wWf7EeJx6ITxv5lpwa9OTHaZlzOZJ-_SkPrh903hHcU6DEkdW09pS5XrbDdhmC5fsOwgIUskuRQFGFqgdPfXVWkxI8-TD7Tsz-r1n13esWBnthSt2w5f7MRDAwSDybfoMb0c_OdrX60t7ygeRrbfKG9pG8lXIulqF-XK9zG-e_DNrWRVroI9rd-f8ueXTi5_SpN2WO7zVxPMIf3hIG9z1K5AELxx_dWPmpf3Y_8eW_wwx2LZ60200GUDh6cuerae4tzFDOzU5fGp5Le2x_rcmGAj1CP9pUy8rgvO-DYszwwOPGA2KQiAwTTsHaSxJ1H_e-vfy9zAzsnOi2xoe3xcRrL9npVwFSc2EbkO329z9LkL99PBtq3_auaVr1dz5h7mfWzmEm5Wd8JI0WSWeBQeW5zBu01ZbNQEK3Gh52rjbcV3m5z8_7qYJFECMopZYy3hGFOoK7kwXv3C9l_xXuOA3T4bgZt_Qi4TqTns90IE2yQ-Wmyz4nQ-lEVgWFtuEikgATAv9ulFl9NhGk7dYX0AWAKiMgsujVzUOfhWkDukgbKCo3rdxNMoSpCslSv7tACI-F3klGZxYp9vaX972-Kgh2LeXSSgARqh1zYf\",\"summary\":[{\"type\":\"summary_text\",\"text\":\"**Ensuring single file read call**\"}]}"
+            },
+            {
+              "type": "toolCall",
+              "id": "call_015GXsB1cA7iRSllmt5RR1bu|fc_00b9de980d45bfad016a7cfa2202008191931963c0203b57a6",
+              "name": "read",
+              "arguments": {
+                "path": "/home/vinicius/workspace/t3-com-pi/.scratch/pi-integration/assets/07-spike-rpc/fixtures/read-target.txt"
+              }
+            }
+          ],
+          "api": "openai-codex-responses",
+          "provider": "openai-codex",
+          "model": "gpt-5.6-luna",
+          "usage": {
+            "input": 3627,
+            "output": 75,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 27,
+            "totalTokens": 3702,
+            "cost": {
+              "input": 0.0007254000000000001,
+              "output": 0.00008999999999999999,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0.0008154000000000001
+            }
+          },
+          "stopReason": "toolUse",
+          "timestamp": 1786575391860,
+          "responseId": "resp_00b9de980d45bfad016a7cfa2083ac8191ae1fc7cc6868d900",
+          "rawStopReason": "completed"
+        },
+        {
+          "role": "toolResult",
+          "toolCallId": "call_015GXsB1cA7iRSllmt5RR1bu|fc_00b9de980d45bfad016a7cfa2202008191931963c0203b57a6",
+          "toolName": "read",
+          "content": [
+            {
+              "type": "text",
+              "text": "SPI_TOOL_READ_OK\n"
+            }
+          ],
+          "isError": false,
+          "timestamp": 1786575394411
+        },
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "SPI_TOOL_READ_OK",
+              "textSignature": "{\"v\":1,\"id\":\"msg_00b9de980d45bfad016a7cfa2323888191bc66a28120d6fa0f\",\"phase\":\"final_answer\"}"
+            }
+          ],
+          "api": "openai-codex-responses",
+          "provider": "openai-codex",
+          "model": "gpt-5.6-luna",
+          "usage": {
+            "input": 1157,
+            "output": 8,
+            "cacheRead": 2560,
+            "cacheWrite": 0,
+            "reasoning": 0,
+            "totalTokens": 3725,
+            "cost": {
+              "input": 0.00023140000000000001,
+              "output": 0.0000096,
+              "cacheRead": 0.0000512,
+              "cacheWrite": 0,
+              "total": 0.0002922
+            }
+          },
+          "stopReason": "stop",
+          "timestamp": 1786575394412,
+          "responseId": "resp_00b9de980d45bfad016a7cfa22d0a481919be90643f10cb577",
+          "rawStopReason": "completed"
+        }
+      ],
+      "willRetry": false
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:35.386Z",
+    "raw": "{\"type\":\"agent_settled\"}",
+    "json": {
+      "type": "agent_settled"
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:35.387Z",
+    "raw": "{\"id\":\"ticket07-03-tool-turn-2\",\"type\":\"response\",\"command\":\"get_state\",\"success\":true,\"data\":{\"model\":{\"id\":\"gpt-5.6-luna\",\"name\":\"GPT-5.6 Luna\",\"api\":\"openai-codex-responses\",\"provider\":\"openai-codex\",\"baseUrl\":\"https://chatgpt.com/backend-api\",\"reasoning\":true,\"input\":[\"text\",\"image\"],\"cost\":{\"input\":0.2,\"output\":1.2,\"cacheRead\":0.02,\"cacheWrite\":0.25,\"tiers\":[{\"inputTokensAbove\":272000,\"input\":0.4,\"output\":1.8,\"cacheRead\":0.04,\"cacheWrite\":0.5}]},\"contextWindow\":272000,\"maxTokens\":128000,\"thinkingLevelMap\":{\"xhigh\":\"xhigh\",\"max\":\"max\",\"minimal\":\"low\"},\"compat\":{\"supportsOpenAIGrammarTools\":true,\"supportsToolSearch\":true}},\"thinkingLevel\":\"xhigh\",\"isStreaming\":false,\"isCompacting\":false,\"steeringMode\":\"one-at-a-time\",\"followUpMode\":\"one-at-a-time\",\"sessionFile\":\"/tmp/pi-rpc-ticket-07-sMvb0e/sessions/2026-08-12T22-56-31-224Z_019ff831-09f8-7360-9dde-d28c0c17646d.jsonl\",\"sessionId\":\"019ff831-09f8-7360-9dde-d28c0c17646d\",\"autoCompactionEnabled\":true,\"messageCount\":4,\"pendingMessageCount\":0}}",
+    "json": {
+      "id": "ticket07-03-tool-turn-2",
+      "type": "response",
+      "command": "get_state",
+      "success": true,
+      "data": {
+        "model": {
+          "id": "gpt-5.6-luna",
+          "name": "GPT-5.6 Luna",
+          "api": "openai-codex-responses",
+          "provider": "openai-codex",
+          "baseUrl": "https://chatgpt.com/backend-api",
+          "reasoning": true,
+          "input": ["text", "image"],
+          "cost": {
+            "input": 0.2,
+            "output": 1.2,
+            "cacheRead": 0.02,
+            "cacheWrite": 0.25,
+            "tiers": [
+              {
+                "inputTokensAbove": 272000,
+                "input": 0.4,
+                "output": 1.8,
+                "cacheRead": 0.04,
+                "cacheWrite": 0.5
+              }
+            ]
+          },
+          "contextWindow": 272000,
+          "maxTokens": 128000,
+          "thinkingLevelMap": {
+            "xhigh": "xhigh",
+            "max": "max",
+            "minimal": "low"
+          },
+          "compat": {
+            "supportsOpenAIGrammarTools": true,
+            "supportsToolSearch": true
+          }
+        },
+        "thinkingLevel": "xhigh",
+        "isStreaming": false,
+        "isCompacting": false,
+        "steeringMode": "one-at-a-time",
+        "followUpMode": "one-at-a-time",
+        "sessionFile": "/tmp/pi-rpc-ticket-07-sMvb0e/sessions/2026-08-12T22-56-31-224Z_019ff831-09f8-7360-9dde-d28c0c17646d.jsonl",
+        "sessionId": "019ff831-09f8-7360-9dde-d28c0c17646d",
+        "autoCompactionEnabled": true,
+        "messageCount": 4,
+        "pendingMessageCount": 0
+      }
+    }
+  },
+  {
+    "at": "2026-08-12T22:56:35.388Z",
+    "raw": "{\"type\":\"extension_ui_request\",\"id\":\"72ff4db5-acc0-4594-8ff5-f3c8f8b9cebb\",\"method\":\"setStatus\",\"statusKey\":\"subagents\"}",
+    "json": {
+      "type": "extension_ui_request",
+      "id": "72ff4db5-acc0-4594-8ff5-f3c8f8b9cebb",
+      "method": "setStatus",
+      "statusKey": "subagents"
+    }
+  }
+]

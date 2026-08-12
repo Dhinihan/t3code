@@ -1,0 +1,88 @@
+{
+  "stateResponse": {
+    "id": "ticket07-05-death-1",
+    "type": "response",
+    "command": "get_state",
+    "success": true,
+    "data": {
+      "model": {
+        "id": "gpt-5.6-luna",
+        "name": "GPT-5.6 Luna",
+        "api": "openai-codex-responses",
+        "provider": "openai-codex",
+        "baseUrl": "https://chatgpt.com/backend-api",
+        "reasoning": true,
+        "input": ["text", "image"],
+        "cost": {
+          "input": 0.2,
+          "output": 1.2,
+          "cacheRead": 0.02,
+          "cacheWrite": 0.25,
+          "tiers": [
+            {
+              "inputTokensAbove": 272000,
+              "input": 0.4,
+              "output": 1.8,
+              "cacheRead": 0.04,
+              "cacheWrite": 0.5
+            }
+          ]
+        },
+        "contextWindow": 272000,
+        "maxTokens": 128000,
+        "thinkingLevelMap": {
+          "xhigh": "xhigh",
+          "max": "max",
+          "minimal": "low"
+        },
+        "compat": {
+          "supportsOpenAIGrammarTools": true,
+          "supportsToolSearch": true
+        }
+      },
+      "thinkingLevel": "xhigh",
+      "isStreaming": false,
+      "isCompacting": false,
+      "steeringMode": "one-at-a-time",
+      "followUpMode": "one-at-a-time",
+      "sessionFile": "/tmp/pi-rpc-ticket-07-ENHrP0/sessions/2026-08-12T22-56-49-241Z_019ff831-5059-7557-a587-dde50740450d.jsonl",
+      "sessionId": "019ff831-5059-7557-a587-dde50740450d",
+      "autoCompactionEnabled": true,
+      "messageCount": 0,
+      "pendingMessageCount": 0
+    }
+  },
+  "promptResponse": {
+    "id": "ticket07-05-death-2",
+    "type": "response",
+    "command": "prompt",
+    "success": true
+  },
+  "sessionFile": "/tmp/pi-rpc-ticket-07-ENHrP0/sessions/2026-08-12T22-56-49-241Z_019ff831-5059-7557-a587-dde50740450d.jsonl",
+  "killedAt": "2026-08-12T22:56:52.785Z",
+  "childPid": 3069834,
+  "descendantPids": [],
+  "beforeKill": [
+    {
+      "pid": 3069834,
+      "stat": "3069834 (pi) S 3068922 3068922 3068922 0 -1 4194304 52773 0 0 0 276 24 0 0 36 16 23 0 9071072 10726813696 64380 18446744073709551615 7544832 50333345 140730520919584 0 0 0 0 4096 1937894967 0 0 0 17 7 0 5 0 0 0 109491696 109680576 266960896 140730520926793 140730520927455 140730520927455 140730520932282 0\n"
+    }
+  ],
+  "afterKill": [
+    {
+      "pid": 3069834,
+      "gone": true
+    }
+  ],
+  "afterCleanup": [],
+  "sessionInspection": [
+    {
+      "path": "/tmp/pi-rpc-ticket-07-ENHrP0/sessions/2026-08-12T22-56-49-241Z_019ff831-5059-7557-a587-dde50740450d.jsonl",
+      "bytes": 1463,
+      "lineCount": 5,
+      "invalidLineCount": 0,
+      "lastLine": "{\"type\":\"message\",\"id\":\"fc06b9c8\",\"parentId\":\"ab17950d\",\"timestamp\":\"2026-08-12T22:56:52.766Z\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"toolCall\",\"id\":\"call_fNhEnLpCJHfGt1gIZNaGcYxD|fc_002f031133f2f207016a7cfa3466608191a92937f0cb42cfa8\",\"name\":\"bash\",\"arguments\":{\"command\":\"sleep 8\",\"timeout\":15}}],\"api\":\"openai-codex-responses\",\"provider\":\"openai-codex\",\"model\":\"gpt-5.6-luna\",\"usage\":{\"input\":3588,\"output\":24,\"cacheRead\":0,\"cacheWrite\":0,\"reasoning\":0,\"totalTokens\":3612,\"cost\":{\"input\":0.0007176000000000001,\"output\":0.0000288,\"cacheRead\":0,\"cacheWrite\":0,\"total\":0.0007464000000000001}},\"stopReason\":\"toolUse\",\"timestamp\":1786575410666,\"responseId\":\"resp_002f031133f2f207016a7cfa3377708191a23563b18d1d22fb\",\"rawStopReason\":\"completed\"}}"
+    }
+  ],
+  "stderr": ""
+}

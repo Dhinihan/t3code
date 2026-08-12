@@ -1,0 +1,2 @@
+{"at":"2026-08-12T22:56:47.624Z","command":{"type":"get_state","id":"ticket07-05-death-1"}}
+{"at":"2026-08-12T22:56:50.643Z","command":{"type":"prompt","message":"Use the built-in bash tool to run `sleep 8`. Do not answer until that command finishes.","id":"ticket07-05-death-2"}}
