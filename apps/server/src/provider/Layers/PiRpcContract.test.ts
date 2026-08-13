@@ -114,6 +114,22 @@ describe("PiRpcContract", () => {
     assert.equal(PiRpc.classifyRecord(realGetState), "response");
   });
 
+  it("retains the extension UI fields used to correlate scoped models", () => {
+    const record = PiRpc.decodeWireRecord({
+      type: "extension_ui_request",
+      id: "ui-1",
+      method: "setStatus",
+      statusKey: "t3-scoped-models:operation-1",
+      statusText: '{"version":1,"models":[]}',
+    });
+
+    assert.equal(record.type, "extension_ui_request");
+    const event = record as PiRpc.PiRpcEvent;
+    assert.equal(event.method, "setStatus");
+    assert.equal(event.statusKey, "t3-scoped-models:operation-1");
+    assert.equal(event.statusText, '{"version":1,"models":[]}');
+  });
+
   it("decodes a prompt acceptance response", () => {
     const record = PiRpc.decodeWireRecord({
       id: "ticket07-04-abort-1",

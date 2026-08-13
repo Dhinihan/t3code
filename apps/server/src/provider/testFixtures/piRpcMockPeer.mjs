@@ -40,7 +40,7 @@ const respondError = (id, command, error) => {
   write({ id, type: "response", command, success: false, error });
 };
 
-const responseFor = (id, command) => {
+const responseFor = (id, command, message) => {
   const canned = script.responses?.[command];
   if (canned !== undefined) {
     respond(id, command, canned);
@@ -71,6 +71,24 @@ const responseFor = (id, command) => {
       return;
     }
     case "prompt": {
+      const messageText = typeof message.message === "string" ? message.message : "";
+      const scopedModelsPrefix = "/t3-scoped-models ";
+      if (messageText.startsWith(scopedModelsPrefix)) {
+        const operationId = messageText.slice(scopedModelsPrefix.length).trim();
+        const payload = script.scopedModelsPayload ?? {
+          version: 1,
+          models: script.scopedModels ?? [],
+        };
+        write({
+          type: "extension_ui_request",
+          id: `ui-${operationId}`,
+          method: "setStatus",
+          statusKey: `t3-scoped-models:${operationId}`,
+          statusText: script.scopedStatusText ?? JSON.stringify(payload),
+        });
+        respond(id, command);
+        return;
+      }
       // The Pi accepts the prompt before the turn streams. Emit the events the
       // host consumes, then the acceptance response, interleaved.
       write({ type: "agent_start" });
@@ -138,7 +156,7 @@ rl.on("line", (line) => {
     return;
   }
 
-  responseFor(id, command);
+  responseFor(id, command, message);
 });
 
 rl.on("close", () => {

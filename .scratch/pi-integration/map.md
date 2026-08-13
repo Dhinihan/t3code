@@ -117,6 +117,11 @@ em [`04-anatomia-do-driver-t3.md`](issues/04-anatomia-do-driver-t3.md) e
   - fixture curada. Revisão adversária aplicada; 28 testes no `vp test run`, sem
     Pi instalado. Detalhes:
     [`14-runtime-jsonl-e-contrato-do-pi.md`](issues/14-runtime-jsonl-e-contrato-do-pi.md).
+- **15 — snapshot e catálogo scoped do Pi:** snapshot inicial `checking`, probe
+  descartável com uma conexão RPC, ponte interna via `--extension`, fallback
+  para `get_available_models`, mapeamento `provider/modelId` com thinking
+  editável e seam para retirar seleção obsoleta após refresh. Detalhes:
+  [`15-snapshot-pi-e-modelos-scoped.md`](issues/15-snapshot-pi-e-modelos-scoped.md).
 
 ## Ainda não especificado
 

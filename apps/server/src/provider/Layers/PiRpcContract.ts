@@ -90,6 +90,13 @@ export interface PiRpcGetStateResponse {
 
 const PiRpcEvent = Schema.Struct({
   type: Schema.String,
+  // Extension UI requests are events, not responses. Keep the small set of
+  // fields consumed by the scoped-model bridge while continuing to ignore
+  // fields introduced by newer Pi releases.
+  id: Schema.optional(Schema.String),
+  method: Schema.optional(Schema.String),
+  statusKey: Schema.optional(Schema.String),
+  statusText: Schema.optional(Schema.String),
 });
 
 export type PiRpcEvent = typeof PiRpcEvent.Type;
