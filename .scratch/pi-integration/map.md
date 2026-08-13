@@ -73,6 +73,12 @@ de `04`. Detalhes e ponteiros de código no ticket `12`.
   isolado; T3 guarda a thread visível, Pi guarda seu contexto, e falhas de
   retomada no MVP são explícitas, sem reconstrução automática. Detalhes:
   [`09-continuidade-de-sessao.md`](issues/09-continuidade-de-sessao.md).
+- **10 — eventos Pi → runtime T3:** o ciclo T3 termina em `agent_settled`;
+  texto, reasoning e ferramentas usam eventos canônicos genéricos. Subagentes
+  continuam sob controle do Pi como tool calls, sem `task.*`; erros locais não
+  matam a sessão, input bloqueante futuro é cancelado com aviso e custo fica
+  fora do MVP. Detalhes:
+  [`10-mapeamento-de-eventos.md`](issues/10-mapeamento-de-eventos.md).
 
 ## Ainda não especificado
 
@@ -88,11 +94,6 @@ Névoa dentro do escopo — visível, ainda não afiada o bastante para virar ti
   conteúdo binário/MIME. Se aceitar, vira ticket de mapeamento do pipeline de
   anexos; se não aceitar, vira decisão sobre erro de backend.
 - **MCP nativo do T3 apenas para o Pi principal.** Depende de `02`.
-- **Subagentes sob o transporte do T3.** Como `subagent_spawn`/`wait`/`cancel`/
-  `check`/`list` e seus resultados atravessam o adapter sem virar UI própria.
-  Depende de `10`.
-- **Modo `full-access` e aprovações.** O escopo diz para não adaptar aprovações;
-  falta confirmar que o Pi nunca fica bloqueado esperando uma. Depende de `01`.
 
 ## Fora de escopo
 
