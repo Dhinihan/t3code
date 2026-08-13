@@ -462,6 +462,124 @@ it.effect("preserves whitespace across assistant deltas and does not repeat the 
   ),
 );
 
+it.effect("turns a Cursor Pi subagent startup abort into an explicit recoverable failure", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("pi-adapter-cursor-subagent-abort");
+      const sessionDouble = yield* makeSessionDouble(threadId);
+      const adapter = yield* makeTestAdapter(sessionDouble);
+      const eventsFiber = yield* adapter.streamEvents.pipe(
+        Stream.filter((event) => event.threadId === threadId),
+        Stream.takeUntil((event) => event.type === "turn.completed"),
+        Stream.runCollect,
+        Effect.forkScoped,
+      );
+
+      yield* adapter.startSession(startInput(threadId));
+      const firstTurn = yield* adapter.sendTurn({
+        threadId,
+        input: "delegate this smoke test",
+        modelSelection: createModelSelection(INSTANCE, "cursor/grok-4.5"),
+      });
+      yield* sessionDouble.push({
+        type: "tool_execution_start",
+        toolCallId: "subagent-tool-1",
+        toolName: "subagent_spawn",
+        args: { harness: "pi", prompt: "smoke test" },
+      });
+      yield* sessionDouble.push({
+        type: "tool_execution_end",
+        toolCallId: "subagent-tool-1",
+        toolName: "subagent_spawn",
+        result: {
+          content: [{ type: "text", text: "Subagent spawn aborted." }],
+          details: {},
+        },
+        isError: true,
+      });
+      yield* sessionDouble.push({
+        type: "message_end",
+        message: {
+          role: "assistant",
+          content: [],
+          stopReason: "error",
+          errorMessage: "This operation was aborted",
+        },
+      });
+      yield* sessionDouble.push({ type: "agent_settled" });
+
+      const events = yield* Fiber.join(eventsFiber);
+      const completed = events.at(-1);
+      assert.equal(completed?.type, "turn.completed");
+      if (completed?.type === "turn.completed") {
+        assert.equal(completed.payload.state, "failed");
+        assert.equal(
+          completed.payload.errorMessage,
+          "Pi subagents are unavailable with Cursor-backed models because nested Pi sessions share Cursor runtime state and abort the parent turn. Choose an openai-codex-backed Pi model or another harness.",
+        );
+      }
+      const subagentFailure = events.find(
+        (event) => event.type === "item.completed" && event.payload.title === "subagent_spawn",
+      );
+      assert.equal(subagentFailure?.type, "item.completed");
+      if (subagentFailure?.type === "item.completed") {
+        assert.equal(
+          subagentFailure.payload.detail,
+          "Pi subagents are unavailable with Cursor-backed models because nested Pi sessions share Cursor runtime state and abort the parent turn. Choose an openai-codex-backed Pi model or another harness.",
+        );
+      }
+      assert.notEqual(firstTurn.turnId, undefined);
+      assert.equal((yield* adapter.listSessions())[0]?.status, "ready");
+
+      const retryTurn = yield* adapter.sendTurn({ threadId, input: "retry normally" });
+      assert.notEqual(retryTurn.turnId, firstTurn.turnId);
+      assert.equal((yield* adapter.listSessions())[0]?.status, "running");
+    }),
+  ),
+);
+
+it.effect("does not reinterpret a user interruption as Cursor subagent unavailability", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("pi-adapter-cursor-subagent-interrupt");
+      const sessionDouble = yield* makeSessionDouble(threadId);
+      const adapter = yield* makeTestAdapter(sessionDouble);
+      const eventsFiber = yield* adapter.streamEvents.pipe(
+        Stream.filter((event) => event.threadId === threadId),
+        Stream.takeUntil((event) => event.type === "turn.aborted"),
+        Stream.runCollect,
+        Effect.forkScoped,
+      );
+
+      yield* adapter.startSession(startInput(threadId));
+      const turn = yield* adapter.sendTurn({
+        threadId,
+        input: "interrupt this delegation",
+        modelSelection: createModelSelection(INSTANCE, "cursor/grok-4.5"),
+      });
+      yield* adapter.interruptTurn(threadId, turn.turnId);
+      yield* sessionDouble.push({
+        type: "tool_execution_end",
+        toolCallId: "subagent-tool-interrupted",
+        toolName: "subagent_spawn",
+        args: { harness: "pi" },
+        result: {
+          content: [{ type: "text", text: "Subagent spawn aborted." }],
+        },
+        isError: true,
+      });
+      yield* sessionDouble.push({ type: "agent_settled" });
+
+      const events = yield* Fiber.join(eventsFiber);
+      assert.equal(events.at(-1)?.type, "turn.aborted");
+      assert.equal(
+        events.some((event) => event.type === "turn.completed"),
+        false,
+      );
+    }),
+  ),
+);
+
 it.effect("cancels blocking extension UI and keeps the Pi turn alive", () =>
   Effect.scoped(
     Effect.gen(function* () {

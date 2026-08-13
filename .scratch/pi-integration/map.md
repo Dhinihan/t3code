@@ -164,6 +164,12 @@ em [`04-anatomia-do-driver-t3.md`](issues/04-anatomia-do-driver-t3.md) e
   por `trim()`, portanto espaços e quebras de linha sobrevivem às fronteiras
   entre chunks e o texto final não é anexado outra vez. Detalhes:
   [`24-pi-resposta-duplicada-por-trim-de-deltas.md`](issues/24-pi-resposta-duplicada-por-trim-de-deltas.md).
+- **26 — contrato explícito de subagentes Pi:** `subagent_spawn` permanece uma
+  tool call genérica e funciona com modelos Pi compatíveis; o adapter classifica
+  a colisão de lifecycle observada em `cursor/*` como capability não suportada,
+  encerra o turno com erro acionável e libera a sessão para retry. Nenhuma thread
+  T3 filha ou processo filho é criado. Detalhes:
+  [`26-subagente-pi-spawn-abortado.md`](issues/26-subagente-pi-spawn-abortado.md).
 
 ## Ainda não especificado
 
