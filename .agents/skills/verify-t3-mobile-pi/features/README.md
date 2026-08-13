@@ -4,7 +4,9 @@ Este mapa descreve a aceitação do usuário final no Android: o APK de desenvol
 
 ## Baseline
 
-- Inicie o run com `helpers/verify-mobile-pi.sh launch` e valide com `doctor`.
+- Inicie o run com `helpers/verify-mobile-pi.sh launch`; ele faz bootstrap/reuso do SDK, ADB e AVD em cache, e valide o resultado com `doctor`.
+- O primeiro run pode baixar a ferramenta e a system image; runs seguintes reutilizam `ANDROID_RUNTIME_CACHE` e mantêm o runtime instalado.
+- Depois do launch, faça `source <state-file>` e `export PATH="$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/emulator:$PATH"` antes das ações `adb` descritas nas features.
 - Use apenas o `ADB_SERIAL` escolhido para este run e o `BASE_DIR` impresso pelo helper.
 - O origin informado ao app Android é `MOBILE_ORIGIN`, normalmente `http://10.0.2.2:<server-port>`.
 - Crie um pairing token novo para cada tentativa; tokens são únicos e não entram em evidência.

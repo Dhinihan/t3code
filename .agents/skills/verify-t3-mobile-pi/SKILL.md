@@ -1,54 +1,52 @@
 ---
 name: verify-t3-mobile-pi
-description: "Reproduz a aceitação do T3 Code Mobile no Android com o provider Pi: pareamento isolado, modelo scoped, texto e imagem, tools genéricas, MCP do T3 no Pi principal, interrupção e retomada. Use manualmente quando uma mudança do mobile, do driver Pi ou do transporte LAN precisar de prova ponta a ponta."
-disable-model-invocation: true
+description: "Use for an Android end-to-end acceptance pass of T3 Code Mobile with the Pi provider: isolated pairing, scoped model, text and image, generic tools, main-Pi MCP, interruption, and resume. The skill provisions or reuses the Android runtime and cached Metro before driving the app."
 ---
 
 # Verificar T3 Mobile com Pi
 
-Esta skill conduz uma execução real do APK `com.t3tools.t3code.dev` em um emulador Android, conectado a um backend T3 descartável e ao Pi instalado no host. Ela não usa setters internos nem endpoints de teste para declarar sucesso: o fluxo passa pelo pareamento, picker, composer e thread que uma pessoa usa.
+Esta skill conduz uma execução real do APK `com.t3tools.t3code.dev` em um emulador Android, conectado a um backend T3 descartável e ao Pi instalado no host. Ela transforma o runtime Android em parte da execução: primeiro localiza/reutiliza um SDK e um device compatíveis; se eles não existirem, instala os componentes mínimos em cache e inicia um AVD próprio. Ela não usa setters internos nem endpoints de teste para declarar sucesso: o fluxo passa pelo pareamento, picker, composer e thread que uma pessoa usa.
 
 Leia o [mapa de funcionalidades](features/README.md) antes de escolher o fluxo. A execução padrão cobre uma thread nova com texto e imagem; os outros arquivos do mapa cobrem tools, MCP e ciclo de interrupção/retomada.
 
-## Launch
+## Bootstrap e launch
 
-Pré-requisitos observados neste checkout:
+O primeiro passo é sempre o bootstrap: a ausência de `adb`, do SDK ou de um AVD dispara a preparação automática. O helper tenta, nesta ordem:
 
-- `node`, `pnpm`, `curl`, `adb` e um emulador Android já iniciado;
-- APK compatível com o Expo Dev Client de desenvolvimento, ou um build local do `apps/mobile`;
-- `pi --version` com suporte ao contrato Pi e as extensões pessoais no host;
-- o checkout atual com dependências instaladas (`pnpm install` já concluído).
+1. reutilizar o `ADB_SERIAL` informado e já online;
+2. reutilizar um SDK compatível e o Metro saudável do mesmo checkout;
+3. instalar em cache `platform-tools`, `emulator`, command-line tools e uma system image `google_apis`;
+4. criar/iniciar um AVD próprio, capturando o PID para o cleanup.
 
-Escolha o emulador sem tocar em dispositivos de outra tarefa:
+O cache Android fica fora do checkout, por padrão em `~/.cache/t3-mobile-pi/android` (ou em `XDG_CACHE_HOME`). O cache é deliberado e persistente; bases T3, reverse ADB, imagem enviada e processos do run continuam descartáveis. Em Linux x86_64 o padrão é API 35 + `x86_64`; em Apple Silicon, API 35 + `arm64-v8a`. Ajuste `ANDROID_API_LEVEL`, `ANDROID_ABI`, `ANDROID_AVD_NAME` ou `ANDROID_RUNTIME_CACHE` somente quando a plataforma exigir.
 
-```bash
-adb devices
-export ADB_SERIAL='<serial-do-emulador>'
-```
+Por segurança, sem `ADB_SERIAL` o helper inicia um AVD próprio mesmo que outro emulador esteja online. Use `REUSE_ANDROID_DEVICE=1` somente quando aquele device pertencer explicitamente à execução atual.
 
-Use o artefato existente, se compatível, ou forneça outro APK de desenvolvimento. O candidato usado na aceitação foi:
+Use o artefato existente, se compatível. O helper procura os outputs locais e o cache de builds antes de construir; se não encontrar um APK, `AUTO_BUILD_APK=1` (padrão) executa `expo run:android --variant development --no-bundler --no-install` contra o device recém-preparado. Forneça `APK_PATH` apenas para escolher um artefato específico. O candidato usado na aceitação foi:
 
 ```bash
 export APK_PATH='/tmp/vinicius/eas-cli-nodejs/eas-build-run-cache/440f643b-ed3a-4cfb-a052-2dd7e69fb4b4_0dc63813-60a5-4c88-9992-b694d9dbb8bb.apk'
 ```
 
-Inicie uma instância com diretório de dados e portas próprios. O helper captura os PIDs que ele mesmo criou, instala `APK_PATH` quando informado, habilita somente `providerInstances.pi`, sem escrever em `~/.t3`:
+Inicie uma instância com diretório de dados e portas próprios. O helper captura os PIDs que ele mesmo criou, provisiona o Android quando necessário, instala `APK_PATH` quando informado, habilita somente `providerInstances.pi`, sem escrever em `~/.t3`:
 
 ```bash
 HELPER="$PWD/.agents/skills/verify-t3-mobile-pi/helpers/verify-mobile-pi.sh"
-REPO_ROOT="$PWD" ADB_SERIAL="$ADB_SERIAL" APK_PATH="$APK_PATH" \
+REPO_ROOT="$PWD" APK_PATH="$APK_PATH" \
   REUSE_METRO=1 METRO_CLEAR=0 "$HELPER" launch
 ```
 
-Guarde o `RUN_DIR`, o `STATE_FILE` e o `EVIDENCE_DIR` impressos. O backend fica no host em `127.0.0.1:<server-port>` e é anunciado ao Android como `http://10.0.2.2:<server-port>`. O Metro usa `tcp:<metro-port>` via reverse ADB.
+Guarde o `RUN_DIR`, o `STATE_FILE` e o `EVIDENCE_DIR` impressos. O launch também registra `android-runtime.txt` e `android-runtime.env`; o segundo é temporário e some no cleanup. O backend fica no host em `127.0.0.1:<server-port>` e é anunciado ao Android como `http://10.0.2.2:<server-port>`. O Metro usa `tcp:<metro-port>` via reverse ADB.
 
 Se o APK não estiver instalado, faça a instalação antes do `doctor`:
 
 ```bash
+source '<state-file>'
+export PATH="$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/emulator:$PATH"
 adb -s "$ADB_SERIAL" shell pm path com.t3tools.t3code.dev
 ```
 
-O `launch` só é considerado pronto quando `/.well-known/t3/environment` e `/status` do Metro respondem. Por padrão ele reaproveita um Metro saudável do mesmo checkout e conserva o cache do bundler; `METRO_CLEAR=1` é reservado para investigar bundle obsoleto. Se falhar, não avance para a UI: rode `RUN_DIR='<run-dir>' "$HELPER" cleanup` e leia `evidence/logs/backend.log` ou `evidence/logs/metro.log`.
+O `launch` só é considerado pronto quando o device Android está online, `/.well-known/t3/environment` e `/status` do Metro respondem, e os três caminhos (`RUN_DIR`, `STATE_FILE`, `EVIDENCE_DIR`) foram impressos. Por padrão ele reaproveita um Metro saudável do mesmo checkout e conserva o cache do bundler; `METRO_CLEAR=1` é reservado para investigar bundle obsoleto. Se o bootstrap ou o launch falhar, o próprio helper encerra o AVD que criou; depois leia `evidence/logs/android-runtime.log`, `evidence/logs/backend.log` ou `evidence/logs/metro.log` antes de tentar novamente.
 
 ## Doctor
 
@@ -75,6 +73,7 @@ Carregue o estado do run e emita um token novo para esse cliente. O token é seg
 
 ```bash
 source '<state-file>'
+export PATH="$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/emulator:$PATH"
 T3CODE_PORT="$SERVER_PORT" node apps/server/src/bin.ts auth pairing create \
   --base-dir "$BASE_DIR" \
   --base-url "$MOBILE_ORIGIN" \
@@ -133,7 +132,7 @@ RUN_DIR='<run-dir>' "$HELPER" capture 01-pi-thread
 
 Uma prova válida registra a ação e o resultado, não somente a tela final. Mantenha todos os artefatos dentro do `EVIDENCE_DIR` do run:
 
-- `doctor.txt`, `server-environment.json`, `metro-status.txt` e logs do backend/Metro para identidade e launch; `metro-reused.txt` prova quando a execução aproveitou o processo/cache existente;
+- `android-runtime.txt`, `doctor.txt`, `server-environment.json`, `metro-status.txt` e logs do runtime/backend/Metro para identidade e launch; `metro-reused.txt` prova quando a execução aproveitou o processo/cache existente;
 - pares `*.ui.xml` + `*.png` para pareamento, picker, anexo, resposta, interrupção e retomada;
 - `db-proof.txt`, gerado depois de a thread terminar:
 
@@ -149,11 +148,11 @@ O `db-proof` registra somente contagens, estados, seleção de modelo truncada, 
 - turno interrompido, novo envio na mesma thread com `RESUME-OK` e nenhum processo Pi órfão depois do settle;
 - ausência de `/quota` e `/hud` no fluxo.
 
-O arquivo [.scratch/pi-integration/issues/23-aceitacao-mobile-pi-ponta-a-ponta.md](../../../.scratch/pi-integration/issues/23-aceitacao-mobile-pi-ponta-a-ponta.md) é a referência histórica da aceitação já concluída; ele não substitui a nova captura da execução.
+O arquivo [.scratch/pi-integration/issues/23-aceitacao-mobile-pi-ponta-a-ponta.md](../../../.scratch/pi-integration/issues/23-aceitacao-mobile-pi-ponta-a-ponta.md) é a referência histórica da aceitação já concluída; ele não substitui a nova captura da execução. O cleanup grava `cleanup.txt`; sem esse arquivo e sem as provas acima, a execução está incompleta.
 
 ## Cleanup
 
-Faça o cleanup mesmo quando uma etapa falhar. Ele remove apenas o reverse ADB criado pelo helper, a imagem exata enviada ao device, os grupos de processos capturados e o `base/` dentro do run. O diretório de evidência permanece:
+Faça o cleanup mesmo quando uma etapa falhar. Ele remove apenas o reverse ADB criado pelo helper, a imagem exata enviada ao device, o AVD iniciado pelo run, os grupos de processos capturados e o `base/` dentro do run. O diretório de evidência permanece:
 
 ```bash
 RUN_DIR='<run-dir>' "$HELPER" cleanup
@@ -166,7 +165,7 @@ Após o cleanup, prove que o artefato sobreviveu e que não há sobra funcional:
 
 ```bash
 find '<evidence-dir>' -maxdepth 2 -type f -print | sort
-adb -s "$ADB_SERIAL" reverse --list
+"$ADB_BIN" -s "$ADB_SERIAL" reverse --list
 ps -eo pid=,ppid=,args= | rg 'pi( |$)|expo start|apps/server/src/bin.ts serve' || true
 ```
 
@@ -174,7 +173,7 @@ O último comando é somente leitura. Se encontrar um processo criado pela execu
 
 ## Helpers
 
-O helper completo está em [helpers/verify-mobile-pi.sh](helpers/verify-mobile-pi.sh). Todas as ações abaixo estão implementadas e recebem o `RUN_DIR` do launch:
+O bootstrap do runtime está em [helpers/android-runtime.sh](helpers/android-runtime.sh); o [helper principal](helpers/verify-mobile-pi.sh) chama-o automaticamente no `launch`. O bootstrap é idempotente e recebe o cache fora do checkout; a ausência inicial de `adb` vira uma etapa executável do run. Todas as ações abaixo estão implementadas e recebem o `RUN_DIR` do launch:
 
 ```bash
 RUN_DIR='<run-dir>' "$HELPER" doctor
@@ -184,5 +183,7 @@ RUN_DIR='<run-dir>' "$HELPER" db-proof
 RUN_DIR='<run-dir>' "$HELPER" env
 RUN_DIR='<run-dir>' "$HELPER" cleanup
 ```
+
+Critério de conclusão da execução: `android-runtime.txt`, `doctor.txt`, `server-environment.json`, `metro-status.txt`, os pares de captura exigidos, `db-proof.txt` e `cleanup.txt` existem no `EVIDENCE_DIR`; o run não é chamado de validado quando qualquer uma dessas provas falta.
 
 Ao alterar o fluxo mobile, atualize também o mapa e rode `/maintain-verification-skill` para procurar entry points, handles ou estados reversos que tenham ficado obsoletos.
