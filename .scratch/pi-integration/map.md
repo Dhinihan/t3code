@@ -100,6 +100,13 @@ em [`04-anatomia-do-driver-t3.md`](issues/04-anatomia-do-driver-t3.md) e
   `provider/modelId`, thinking é editável por turno e catálogo obsoleto falha
   explicitamente enquanto solicita refresh. Detalhes:
   [`12-modelos-na-ui-sem-quebrar-o-rebase.md`](issues/12-modelos-na-ui-sem-quebrar-o-rebase.md).
+- **Papel do Pi no serviço auxiliar de text generation:** o driver declara o
+  serviço não suportado — as quatro operações falham com `TextGenerationError`
+  sem criar processo Pi, com uma mensagem única e acionável. Pegada zero em
+  contracts e clients; stub em `PiTextGeneration.ts` com teste par; manter um
+  provider nativo habilitado para geração auxiliar é restrição documentada.
+  Detalhes:
+  [`20-papel-do-pi-em-text-generation.md`](issues/20-papel-do-pi-em-text-generation.md).
 
 ## Ainda não especificado
 
@@ -121,3 +128,8 @@ escopo aprovado:
 - Suporte garantido a extensões frontend do Pi.
 - Atualização automática, empacotamento ou matriz de versões do Pi.
 - T3 Connect, relay ou qualquer serviço hospedado no caminho do mobile.
+- Geração auxiliar de texto pelo Pi (títulos de thread, nomes de branch,
+  mensagens de commit, conteúdo de PR). O despacho é por instância selecionada,
+  não pela thread, então o destino do mapa não passa por aqui; o slot existe e
+  falha explícito. Decidido em
+  [`20-papel-do-pi-em-text-generation.md`](issues/20-papel-do-pi-em-text-generation.md).
