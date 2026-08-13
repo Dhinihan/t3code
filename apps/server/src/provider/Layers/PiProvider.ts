@@ -13,6 +13,7 @@ import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import * as ChildProcess from "effect/unstable/process/ChildProcess";
+import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
 
 import {
   TrimmedNonEmptyString,
@@ -32,7 +33,7 @@ import {
   type CommandResult,
   type ServerProviderDraft,
 } from "../providerSnapshot.ts";
-import { assessPiCompatibility } from "./PiCompatibility.ts";
+import { assessPiCompatibility, MINIMUM_PI_VERSION } from "./PiCompatibility.ts";
 import { connectPiRpc, type PiRpcConnection } from "./PiRpcConnection.ts";
 import { decodeGetStateResponse, type PiRpcResponse } from "./PiRpcContract.ts";
 import type * as PiRpcErrors from "./PiRpcErrors.ts";
@@ -49,6 +50,7 @@ export const PI_SCOPED_MODELS_EXTENSION_PATH = NodePath.join(
 export const PI_VERSION_PROBE_TIMEOUT_MS = 4_000;
 export const PI_CATALOG_PROBE_TIMEOUT_MS = 10_000;
 export const PI_SCOPED_MODELS_TIMEOUT_MS = 4_000;
+const PI_UNRESOLVED_VERSION = "unknown";
 
 const PI_PRESENTATION = {
   displayName: "Pi",
@@ -120,7 +122,7 @@ export interface PiProviderProbeDependencies {
   ) => Effect.Effect<
     PiRpcConnection,
     PiProviderProbeDependencyError | PiRpcErrors.PiRpcError,
-    Scope.Scope | typeof HostProcessPlatform
+    Scope.Scope
   >;
 }
 
@@ -420,6 +422,28 @@ function runPiVersionCommand(settings: PiProviderSettings) {
   );
 }
 
+/**
+ * Read the version used by the session handshake while materializing a
+ * provider instance. A failed eager probe uses an intentionally incompatible
+ * sentinel; the managed snapshot probe still reports the concrete failure,
+ * while a session cannot proceed until a real compatible version is known.
+ */
+export const resolvePiVersionForSession = Effect.fn("resolvePiVersionForSession")(function* (
+  settings: PiProviderSettings,
+): Effect.fn.Return<string, never, ChildProcessSpawner.ChildProcessSpawner> {
+  const versionResult = yield* runPiVersionCommand(settings).pipe(
+    Effect.timeoutOption(PI_VERSION_PROBE_TIMEOUT_MS),
+    Effect.result,
+  );
+  if (versionResult._tag === "Failure" || Option.isNone(versionResult.success)) {
+    return PI_UNRESOLVED_VERSION;
+  }
+
+  const output = versionResult.success.value;
+  const version = parseGenericCliVersion(`${output.stdout}\n${output.stderr}`);
+  return output.code === 0 && version !== null ? version : PI_UNRESOLVED_VERSION;
+});
+
 function connectPiProbe(settings: PiProviderSettings) {
   return connectPiRpc({
     binaryPath: settings.binaryPath.trim() || PI_PROVIDER_BINARY,
@@ -476,7 +500,7 @@ function errorMessage(error: unknown): string {
 export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function* (
   settings: PiProviderSettings,
   dependencies: PiProviderProbeDependencies = {},
-) {
+): Effect.fn.Return<ServerProviderDraft, never, ChildProcessSpawner.ChildProcessSpawner> {
   const checkedAt = DateTime.formatIso(yield* DateTime.now);
   if (!settings.enabled) {
     return providerSnapshot({
@@ -552,7 +576,11 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
         Effect.ensuring(connection.close),
       );
     }),
-  ).pipe(Effect.timeoutOption(PI_CATALOG_PROBE_TIMEOUT_MS), Effect.exit);
+  ).pipe(
+    Effect.timeoutOption(PI_CATALOG_PROBE_TIMEOUT_MS),
+    Effect.exit,
+    Effect.provideService(HostProcessPlatform, process.platform),
+  );
 
   if (catalogExit._tag === "Failure") {
     return providerSnapshot({

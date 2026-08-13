@@ -145,6 +145,14 @@ em [`04-anatomia-do-driver-t3.md`](issues/04-anatomia-do-driver-t3.md) e
   thread; o manager injeta `--extension` apenas no processo principal,
   preserva extensões pessoais e revoga/limpa no stop, handshake falho ou crash.
   Detalhes: [`19-mcp-t3-somente-no-pi-principal.md`](issues/19-mcp-t3-somente-no-pi-principal.md).
+- **21 — montagem e registro do `ProviderDriver` Pi:** `PiDriver` reúne
+  snapshot, adapter, manager de sessões isoladas, anexos e o slot explícito de
+  text generation não suportado. O Pi entra em `BUILT_IN_DRIVERS` via o
+  envelope aberto `providerInstances`, sem chave legacy em `settings.providers`;
+  web/mobile seguem os caminhos genéricos de display name e catálogo. A versão
+  é lida antes do manager, e versão ausente/malformada fica incompatível até o
+  probe confirmar um Pi real. Detalhes:
+  [`21-montar-e-registrar-o-driver-pi.md`](issues/21-montar-e-registrar-o-driver-pi.md).
 
 ## Ainda não especificado
 
