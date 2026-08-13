@@ -10,6 +10,7 @@
  */
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
+import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 
 import { assert, it } from "@effect/vitest";
@@ -129,7 +130,7 @@ it.live("times out a request whose response never arrives", () =>
     assert.equal(result._tag, "Failure");
     if (result._tag === "Failure") {
       const cause = result.cause;
-      if (cause instanceof PiRpcRequestTimeoutError) {
+      if (Schema.is(PiRpcRequestTimeoutError)(cause)) {
         assert.include(cause.message, "get_state");
       }
     }

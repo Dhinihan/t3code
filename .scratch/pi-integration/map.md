@@ -117,6 +117,12 @@ em [`04-anatomia-do-driver-t3.md`](issues/04-anatomia-do-driver-t3.md) e
   - fixture curada. Revisão adversária aplicada; 28 testes no `vp test run`, sem
     Pi instalado. Detalhes:
     [`14-runtime-jsonl-e-contrato-do-pi.md`](issues/14-runtime-jsonl-e-contrato-do-pi.md).
+- **16 — sessões Pi por thread e continuidade:** `PiSessionManager` mantém o
+  vínculo 1:1 por `session-id` determinístico dentro do `session-dir` isolado,
+  inicia sob demanda, reutiliza enquanto ativo e encerra pelo child scope,
+  stop, reaper ou crash. O `resumeCursor` versionado valida identidade,
+  namespace e histórico; retomada impossível falha sem reconstruir contexto.
+  Detalhes: [`16-sessoes-pi-e-continuidade.md`](issues/16-sessoes-pi-e-continuidade.md).
 
 ## Ainda não especificado
 

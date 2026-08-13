@@ -24,7 +24,6 @@ import * as Stream from "effect/Stream";
 import * as ChildProcess from "effect/unstable/process/ChildProcess";
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
 
-import { HostProcessPlatform } from "@t3tools/shared/hostProcess";
 import { resolveSpawnCommand } from "@t3tools/shared/shell";
 
 import * as PiRpcErrors from "./PiRpcErrors.ts";
@@ -42,6 +41,8 @@ export interface PiRpcConnectionOptions {
 
 export interface PiRpcConnection {
   readonly pid: number;
+  /** Resolves when the child exits, including an unexpected crash. */
+  readonly exitCode: Effect.Effect<ChildProcessSpawner.ExitCode, never>;
   readonly events: PiRpcProtocol.PiRpcProtocol["events"];
   readonly request: PiRpcProtocol.PiRpcProtocol["request"];
   /** Last captured stderr diagnostic lines (best-effort, bounded). */
@@ -55,10 +56,10 @@ export const connectPiRpc = Effect.fn("connectPiRpc")(function* (
 ): Effect.fn.Return<
   PiRpcConnection,
   PiRpcErrors.PiRpcSpawnError | PiRpcErrors.PiRpcTransportError,
-  ChildProcessSpawner.ChildProcessSpawner | typeof HostProcessPlatform | Scope.Scope
+  ChildProcessSpawner.ChildProcessSpawner | Scope.Scope
 > {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-  const hostPlatform = yield* HostProcessPlatform;
+  const hostPlatform = process.platform;
   const runtimeScope = yield* Scope.Scope;
 
   const env = options.environment;
@@ -106,12 +107,12 @@ export const connectPiRpc = Effect.fn("connectPiRpc")(function* (
 
   // A deferred the exit watcher resolves once, so close can WAIT for the
   // child to actually exit instead of sleeping a fixed amount.
-  const exitedDeferred = yield* Deferred.make<void, never>();
+  const exitedDeferred = yield* Deferred.make<ChildProcessSpawner.ExitCode, never>();
 
   // Classify process death as a typed termination that fails any pending
   // request through the protocol's terminationError path.
   yield* child.exitCode.pipe(
-    Effect.flatMap((_code) => Deferred.succeed(exitedDeferred, undefined).pipe(Effect.ignore)),
+    Effect.flatMap((code) => Deferred.succeed(exitedDeferred, code).pipe(Effect.ignore)),
     Effect.ignore,
     Effect.forkIn(runtimeScope),
   );
@@ -128,18 +129,17 @@ export const connectPiRpc = Effect.fn("connectPiRpc")(function* (
 
   const killProcessGroup = (signal: "SIGTERM" | "SIGKILL") =>
     hostPlatform === "win32"
-      ? child.kill({ killSignal: signal, forceKillAfter: PI_FORCE_KILL_AFTER }).pipe(Effect.asVoid)
+      ? child.kill({ killSignal: signal, forceKillAfter: PI_FORCE_KILL_AFTER }).pipe(Effect.ignore)
       : Effect.gen(function* () {
           // Signal the direct child first so the handle's exitCode emits, then
           // the whole group (detached spawn) so subagent descendants die too.
           yield* child
             .kill({ killSignal: signal, forceKillAfter: PI_FORCE_KILL_AFTER })
             .pipe(Effect.ignore);
-          try {
-            process.kill(-Number(child.pid), signal);
-          } catch {
-            // The process group may already be gone; best-effort.
-          }
+          yield* Effect.try({
+            try: () => process.kill(-Number(child.pid), signal),
+            catch: () => undefined,
+          }).pipe(Effect.ignore);
         });
 
   const closedRef = yield* Ref.make(false);
@@ -163,6 +163,7 @@ export const connectPiRpc = Effect.fn("connectPiRpc")(function* (
 
   return {
     pid: Number(child.pid),
+    exitCode: Deferred.await(exitedDeferred),
     events: protocol.events,
     request: protocol.request,
     stderr: Ref.get(stderrRef),

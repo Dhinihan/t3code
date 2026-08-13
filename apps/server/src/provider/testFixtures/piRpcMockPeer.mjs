@@ -50,10 +50,11 @@ const responseFor = (id, command) => {
     case "get_state": {
       sessionIdCounter += 1;
       respond(id, command, {
-        sessionId: `sess-${sessionIdCounter}`,
-        sessionFile: `/tmp/pi-peer/${script.sessionId ?? "session"}.jsonl`,
+        sessionId: script.sessionId ?? `sess-${sessionIdCounter}`,
+        sessionFile: script.sessionFile ?? `/tmp/pi-peer/session.jsonl`,
         model: script.stateModel,
         thinkingLevel: script.stateThinkingLevel ?? "xhigh",
+        messageCount: script.messageCount ?? 0,
       });
       return;
     }

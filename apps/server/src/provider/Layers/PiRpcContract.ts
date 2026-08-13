@@ -57,6 +57,7 @@ const PiRpcGetStateData = Schema.Struct({
   model: Schema.optional(Schema.Unknown),
   thinkingLevel: Schema.optional(Schema.Unknown),
   sessionFile: Schema.optional(Schema.Unknown),
+  messageCount: Schema.optional(Schema.Number),
 });
 
 const PiRpcResponse = Schema.Struct({
@@ -78,9 +79,10 @@ export interface PiRpcGetStateResponse {
   readonly data: {
     readonly sessionId: string;
     /** Tolerated, not consumed by the handshake; decode on demand later. */
-    readonly model?: unknown;
+    readonly model?: Readonly<Record<string, unknown>>;
     readonly thinkingLevel?: unknown;
     readonly sessionFile?: unknown;
+    readonly messageCount?: number | undefined;
   };
 }
 
@@ -159,11 +161,20 @@ export function decodeGetStateResponse(input: unknown): Option.Option<PiRpcGetSt
   if (data._tag === "None") {
     return Option.none();
   }
+  const decodedData = data.value;
   return Option.some({
     type: "response",
     id: value.id,
     command: "get_state",
     success: true,
-    data: data.value,
+    data: {
+      sessionId: decodedData.sessionId,
+      ...(isObject(decodedData.model) ? { model: decodedData.model } : {}),
+      ...(decodedData.thinkingLevel === undefined
+        ? {}
+        : { thinkingLevel: decodedData.thinkingLevel }),
+      ...(decodedData.sessionFile === undefined ? {} : { sessionFile: decodedData.sessionFile }),
+      ...(decodedData.messageCount === undefined ? {} : { messageCount: decodedData.messageCount }),
+    },
   });
 }
