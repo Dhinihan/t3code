@@ -119,6 +119,26 @@ export interface PiRpcGetStateResponse {
   };
 }
 
+const PiRpcAvailableThinkingLevelsData = Schema.Struct({
+  levels: Schema.Array(Schema.String),
+});
+
+/** Decode the thinking-level catalog consumed by the manual compatibility probe. */
+export function decodeAvailableThinkingLevelsResponse(
+  input: unknown,
+): Option.Option<ReadonlyArray<string>> {
+  const response = decodeResponse(input);
+  if (response._tag === "None") return Option.none();
+  if (
+    response.value.command !== "get_available_thinking_levels" ||
+    response.value.success !== true
+  ) {
+    return Option.none();
+  }
+  const data = decodeAvailableThinkingLevelsData(response.value.data);
+  return data._tag === "Some" ? Option.some(data.value.levels) : Option.none();
+}
+
 // ---------------------------------------------------------------------------
 // Events
 // ---------------------------------------------------------------------------
@@ -158,6 +178,9 @@ export type PiRpcEvent = typeof PiRpcEvent.Type;
 const decodeResponse = Schema.decodeUnknownOption(PiRpcResponse);
 const decodeEvent = Schema.decodeUnknownOption(PiRpcEvent);
 const decodeGetStateData = Schema.decodeUnknownOption(PiRpcGetStateData);
+const decodeAvailableThinkingLevelsData = Schema.decodeUnknownOption(
+  PiRpcAvailableThinkingLevelsData,
+);
 
 /** Categorizes a decoded record into the shapes the runtime routes on. */
 export function classifyRecord(record: PiRpcResponse | PiRpcEvent): "response" | "event" {

@@ -153,6 +153,13 @@ em [`04-anatomia-do-driver-t3.md`](issues/04-anatomia-do-driver-t3.md) e
   é lida antes do manager, e versão ausente/malformada fica incompatível até o
   probe confirmar um Pi real. Detalhes:
   [`21-montar-e-registrar-o-driver-pi.md`](issues/21-montar-e-registrar-o-driver-pi.md).
+- **22 — probe real de compatibilidade:** comando manual `pnpm probe:pi` verifica
+  a versão instalada, exercita o Pi real em sessão temporária (handshake,
+  catálogo, thinking, texto, ferramenta, abort, shutdown e resume), reutiliza
+  os decodificadores de produção e expõe novidades somente como nomes de
+  campos/eventos. Saída segura, sem regravação de fixtures e com limpeza
+  scoped. Detalhes:
+  [`22-probe-real-de-compatibilidade-pi.md`](issues/22-probe-real-de-compatibilidade-pi.md).
 
 ## Ainda não especificado
 
