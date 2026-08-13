@@ -107,6 +107,16 @@ em [`04-anatomia-do-driver-t3.md`](issues/04-anatomia-do-driver-t3.md) e
   provider nativo habilitado para geração auxiliar é restrição documentada.
   Detalhes:
   [`20-papel-do-pi-em-text-generation.md`](issues/20-papel-do-pi-em-text-generation.md).
+- **Runtime JSONL e contrato de compatibilidade do Pi:** fronteira de
+  processo/protocolo em camadas, toda em arquivos novos — contrato puro
+  tolerante (novidade se ignora, ausência derruba), política de compatibilidade
+  compartilhada (piso `0.84.1` + `get_state`, erro tipado com mensagem estável),
+  transporte JSONL com correlação, término falhando pendentes, timeout de
+  request e sem travamento pós-término, conexão scoped com `detached`, stderr
+  exposto, close sem fechar o scope do chamador e sem sleep fixo. Peer hermético
+  - fixture curada. Revisão adversária aplicada; 28 testes no `vp test run`, sem
+    Pi instalado. Detalhes:
+    [`14-runtime-jsonl-e-contrato-do-pi.md`](issues/14-runtime-jsonl-e-contrato-do-pi.md).
 
 ## Ainda não especificado
 
