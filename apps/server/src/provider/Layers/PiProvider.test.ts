@@ -7,6 +7,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
+import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
 
 import { assert, describe, it } from "@effect/vitest";
 
@@ -66,6 +67,7 @@ const connection = (input: {
   events: Stream.fromIterable(input.events as ReadonlyArray<never>),
   stderr: Effect.succeed(""),
   close: Effect.void,
+  exitCode: Effect.succeed(ChildProcessSpawner.ExitCode(0)),
 });
 
 const stateResponse = {

@@ -5,6 +5,7 @@
  * Pins the stable public message required by ticket 13.
  */
 import { assert, describe, it } from "vite-plus/test";
+import * as Schema from "effect/Schema";
 
 import * as PiCompatibility from "./PiCompatibility.ts";
 import { PiRpcCompatibilityError } from "./PiRpcErrors.ts";
@@ -22,8 +23,10 @@ const assess = (input: PiCompatibility.PiCompatibilityInput) =>
   PiCompatibility.assessPiCompatibility(input);
 
 const asFailure = (result: ReturnType<typeof assess>): PiRpcCompatibilityError => {
-  assert.equal(result._tag, "Failure");
-  return result.failure;
+  if (result._tag === "Failure") {
+    return result.failure;
+  }
+  throw new Error("Expected compatibility assessment to fail");
 };
 
 describe("PiCompatibility", () => {
@@ -42,7 +45,7 @@ describe("PiCompatibility", () => {
 
   it("rejects a version below the floor with a typed error", () => {
     const error = asFailure(assess({ version: "0.84.0", state: state("sess-1") }));
-    assert.ok(error instanceof PiRpcCompatibilityError);
+    assert.isTrue(Schema.is(PiRpcCompatibilityError)(error));
     assert.equal(error.operation, "version");
     assert.equal(error.piVersion, "0.84.0");
   });

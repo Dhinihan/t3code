@@ -122,6 +122,12 @@ em [`04-anatomia-do-driver-t3.md`](issues/04-anatomia-do-driver-t3.md) e
   para `get_available_models`, mapeamento `provider/modelId` com thinking
   editável e seam para retirar seleção obsoleta após refresh. Detalhes:
   [`15-snapshot-pi-e-modelos-scoped.md`](issues/15-snapshot-pi-e-modelos-scoped.md).
+- **16 — sessões Pi por thread e continuidade:** `PiSessionManager` mantém o
+  vínculo 1:1 por `session-id` determinístico dentro do `session-dir` isolado,
+  inicia sob demanda, reutiliza enquanto ativo e encerra pelo child scope,
+  stop, reaper ou crash. O `resumeCursor` versionado valida identidade,
+  namespace e histórico; retomada impossível falha sem reconstruir contexto.
+  Detalhes: [`16-sessoes-pi-e-continuidade.md`](issues/16-sessoes-pi-e-continuidade.md).
 
 ## Ainda não especificado
 

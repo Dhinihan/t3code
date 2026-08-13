@@ -14,6 +14,7 @@ import * as NodePath from "node:path";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
+import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 
 import { assert, it } from "@effect/vitest";
@@ -116,7 +117,7 @@ it.live("surfaces a command error from the peer", () =>
       assert.equal(result._tag, "Failure");
       if (result._tag === "Failure") {
         const error = result.cause;
-        if (error instanceof PiRpcRequestError) {
+        if (Schema.is(PiRpcRequestError)(error)) {
           assert.include(error.message, "Model not found");
         }
       }

@@ -32,7 +32,12 @@ import {
   type PiRpcEvent,
   type PiRpcResponse,
 } from "./PiRpcContract.ts";
-import { PiRpcRequestError, PiRpcTransportError, PiRpcTerminatedError } from "./PiRpcErrors.ts";
+import {
+  PiRpcRequestError,
+  PiRpcRequestTimeoutError,
+  PiRpcTransportError,
+  PiRpcTerminatedError,
+} from "./PiRpcErrors.ts";
 import type * as PiRpcErrors from "./PiRpcErrors.ts";
 
 const decoder = new TextDecoder();
@@ -56,7 +61,7 @@ export interface PiRpcProtocolOptions {
    * instead of hanging forever. The connection layer sets a default so a
    * wedged Pi can never strand a turn.
    */
-  readonly requestTimeout?: import("effect/Duration").DurationInput;
+  readonly requestTimeout?: Duration.Input;
 }
 
 export interface PiRpcProtocol {
@@ -82,7 +87,7 @@ export const makePiRpcProtocol = Effect.fn("makePiRpcProtocol")(function* (
   options: PiRpcProtocolOptions,
 ): Effect.fn.Return<PiRpcProtocol, never, import("effect/Scope").Scope> {
   const outgoing = yield* Queue.unbounded<Uint8Array, Cause.Done<void>>();
-  const incomingEvents = yield* Queue.unbounded<PiRpcEvent>();
+  const incomingEvents = yield* Queue.unbounded<PiRpcEvent, Cause.Done<void>>();
   const pending = yield* Ref.make(new Map<string, PendingRequest>());
   const remainder = yield* Ref.make("");
   const terminationHandled = yield* Ref.make(false);
@@ -243,7 +248,7 @@ export const makePiRpcProtocol = Effect.fn("makePiRpcProtocol")(function* (
 
   return {
     request: requestCommand,
-    events: Stream.fromQueue(incomingEvents),
+    events: Stream.fromQueue(incomingEvents).pipe(Stream.catchCause(() => Stream.empty)),
     close,
   } satisfies PiRpcProtocol;
 });
