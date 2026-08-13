@@ -90,6 +90,12 @@ de `04`. Detalhes e ponteiros de código no ticket `12`.
   ausente. Decodificação tolerante: novidade se ignora, ausência derruba. Sem
   teto de versão; manutenção = atualizou o Pi, roda a suíte. Detalhes:
   [`11-handshake-e-versao.md`](issues/11-handshake-e-versao.md).
+- **Suíte do adapter Pi e detecção de drift do Pi:** suíte hermética e
+  contribuível em três níveis (contrato puro, runtime contra peer JSONL e
+  adapter com test double); fixtures reais curadas ficam congeladas. Um probe
+  manual permanente fala com o Pi instalado e detecta drift antes da suíte,
+  sem alterar fixtures automaticamente. Detalhes:
+  [`13-suite-do-adapter-e-drift-do-pi.md`](issues/13-suite-do-adapter-e-drift-do-pi.md).
 
 ## Ainda não especificado
 
