@@ -128,6 +128,11 @@ em [`04-anatomia-do-driver-t3.md`](issues/04-anatomia-do-driver-t3.md) e
   stop, reaper ou crash. O `resumeCursor` versionado valida identidade,
   namespace e histórico; retomada impossível falha sem reconstruir contexto.
   Detalhes: [`16-sessoes-pi-e-continuidade.md`](issues/16-sessoes-pi-e-continuidade.md).
+- **MCP nativo do T3 somente no Pi principal:** extensão T3 sem imports com
+  Streamable HTTP eager, wrapper temporário fora do projeto e bearer por
+  thread; o manager injeta `--extension` apenas no processo principal,
+  preserva extensões pessoais e revoga/limpa no stop, handshake falho ou crash.
+  Detalhes: [`19-mcp-t3-somente-no-pi-principal.md`](issues/19-mcp-t3-somente-no-pi-principal.md).
 
 ## Ainda não especificado
 

@@ -4,7 +4,7 @@ import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { ThreadId } from "@t3tools/contracts";
+import { EnvironmentId, ProviderInstanceId, ThreadId } from "@t3tools/contracts";
 import { assert, it } from "@effect/vitest";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -14,6 +14,7 @@ import * as Stream from "effect/Stream";
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
 
 import { connectPiRpc, type PiRpcConnection } from "./PiRpcConnection.ts";
+import * as McpProviderSession from "../../mcp/McpProviderSession.ts";
 import {
   makePiSessionManager,
   piSessionIdForThread,
@@ -139,6 +140,146 @@ it.effect("handshakes once and reuses the active process for a thread", () =>
       ]);
       yield* manager.stop(threadId);
       assert.equal(fake.connections[0]?.closeCalls.length, 1);
+    }),
+  ),
+);
+
+it.effect("gives only the main Pi process an ephemeral T3 MCP extension", () =>
+  run(
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("thread-mcp");
+      const sessionDir = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "pi-session-mcp-"));
+      const config = {
+        environmentId: EnvironmentId.make("environment-pi"),
+        threadId,
+        providerSessionId: "provider-session-mcp",
+        providerInstanceId: ProviderInstanceId.make("pi"),
+        endpoint: "http://127.0.0.1:43123/mcp",
+        authorizationHeader: "Bearer main-pi-only-secret",
+      };
+      const revoked: string[] = [];
+      McpProviderSession.setMcpProviderSession(config);
+      const fake = makeFakeConnector({
+        states: [
+          makeState({
+            sessionId: piSessionIdForThread(threadId),
+            sessionFile: NodePath.join(sessionDir, "session.jsonl"),
+          }),
+        ],
+      });
+
+      try {
+        const manager = yield* makePiSessionManager({
+          binaryPath: "pi",
+          cwd: "/repo",
+          sessionDir,
+          piVersion: "0.84.1",
+          args: ["--extension", "/home/user/.pi/agent/extensions/personal.ts"],
+          connect: fake.connect,
+          revokeMcpProviderSession: (providerSessionId) =>
+            Effect.sync(() => {
+              revoked.push(providerSessionId);
+            }),
+        });
+        yield* manager.start({ threadId });
+
+        const call = fake.calls[0];
+        assert.isDefined(call);
+        if (!call) return;
+        const args = call.args;
+        assert.isDefined(args);
+        if (!args) return;
+        const extensionIndex = args.lastIndexOf("--extension");
+        assert.isAtLeast(extensionIndex, 0);
+        const extensionPath = args[extensionIndex + 1];
+        assert.isString(extensionPath);
+        if (typeof extensionPath !== "string") return;
+        assert.notInclude(args, config.authorizationHeader);
+        assert.notEqual(call.environment?.T3_MCP_BEARER_TOKEN, "main-pi-only-secret");
+        assert.include(NodeFS.readFileSync(extensionPath, "utf8"), config.authorizationHeader);
+        assert.include(args, "/home/user/.pi/agent/extensions/personal.ts");
+        assert.notEqual(NodePath.dirname(extensionPath), NodePath.resolve("/repo"));
+        assert.notEqual(NodePath.dirname(extensionPath), NodePath.resolve(sessionDir));
+        assert.equal(NodeFS.existsSync(extensionPath), true);
+
+        yield* manager.stop(threadId);
+        assert.equal(NodeFS.existsSync(extensionPath), false);
+        assert.deepEqual(revoked, [config.providerSessionId]);
+        assert.equal(McpProviderSession.readMcpProviderSession(threadId), undefined);
+      } finally {
+        McpProviderSession.clearAllMcpProviderSessions();
+        NodeFS.rmSync(sessionDir, { recursive: true, force: true });
+      }
+    }),
+  ),
+);
+
+it.effect("revokes and removes the Pi MCP lease after an unexpected process exit", () =>
+  run(
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("thread-mcp-crash");
+      const sessionDir = NodeFS.mkdtempSync(
+        NodePath.join(NodeOS.tmpdir(), "pi-session-mcp-crash-"),
+      );
+      const config = {
+        environmentId: EnvironmentId.make("environment-pi"),
+        threadId,
+        providerSessionId: "provider-session-mcp-crash",
+        providerInstanceId: ProviderInstanceId.make("pi"),
+        endpoint: "http://127.0.0.1:43123/mcp",
+        authorizationHeader: "Bearer crash-only-secret",
+      };
+      const revoked: string[] = [];
+      const cleanupStarted = yield* Deferred.make<void, never>();
+      McpProviderSession.setMcpProviderSession(config);
+      const fake = makeFakeConnector({
+        states: [
+          makeState({
+            sessionId: piSessionIdForThread(threadId),
+            sessionFile: NodePath.join(sessionDir, "session.jsonl"),
+          }),
+        ],
+      });
+
+      try {
+        const manager = yield* makePiSessionManager({
+          binaryPath: "pi",
+          cwd: "/repo",
+          sessionDir,
+          piVersion: "0.84.1",
+          connect: fake.connect,
+          revokeMcpProviderSession: (providerSessionId) =>
+            Effect.gen(function* () {
+              revoked.push(providerSessionId);
+              yield* Deferred.succeed(cleanupStarted, undefined);
+            }),
+        });
+        yield* manager.start({ threadId });
+        const call = fake.calls[0];
+        assert.isDefined(call);
+        if (!call) return;
+        const args = call.args;
+        assert.isDefined(args);
+        if (!args) return;
+        const extensionIndex = args.lastIndexOf("--extension");
+        const extensionPath = extensionIndex < 0 ? undefined : args[extensionIndex + 1];
+        assert.isString(extensionPath);
+        if (typeof extensionPath !== "string") return;
+
+        const connection = fake.connections[0];
+        assert.isDefined(connection);
+        if (!connection) return;
+        yield* Deferred.succeed(connection.exit, ChildProcessSpawner.ExitCode(9));
+        yield* Deferred.await(cleanupStarted);
+
+        assert.equal(yield* manager.has(threadId), false);
+        assert.equal(NodeFS.existsSync(extensionPath), false);
+        assert.deepEqual(revoked, [config.providerSessionId]);
+        assert.equal(McpProviderSession.readMcpProviderSession(threadId), undefined);
+      } finally {
+        McpProviderSession.clearAllMcpProviderSessions();
+        NodeFS.rmSync(sessionDir, { recursive: true, force: true });
+      }
     }),
   ),
 );
