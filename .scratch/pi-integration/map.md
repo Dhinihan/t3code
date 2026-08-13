@@ -134,6 +134,11 @@ em [`04-anatomia-do-driver-t3.md`](issues/04-anatomia-do-driver-t3.md) e
   genéricos e trata erros locais, abort, processo morto e UI bloqueante sem
   travar a sessão. Detalhes:
   [`17-adapter-pi-turnos-e-eventos.md`](issues/17-adapter-pi-turnos-e-eventos.md).
+- **MCP nativo do T3 somente no Pi principal:** extensão T3 sem imports com
+  Streamable HTTP eager, wrapper temporário fora do projeto e bearer por
+  thread; o manager injeta `--extension` apenas no processo principal,
+  preserva extensões pessoais e revoga/limpa no stop, handshake falho ou crash.
+  Detalhes: [`19-mcp-t3-somente-no-pi-principal.md`](issues/19-mcp-t3-somente-no-pi-principal.md).
 
 ## Ainda não especificado
 

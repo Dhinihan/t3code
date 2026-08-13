@@ -22,7 +22,9 @@ import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import * as Semaphore from "effect/Semaphore";
 
+import * as McpProviderSession from "../../mcp/McpProviderSession.ts";
 import * as PiCompatibility from "./PiCompatibility.ts";
+import { makePiMcpSessionLease, type PiMcpSessionLease } from "./PiMcpSession.ts";
 import { connectPiRpc, type PiRpcConnection } from "./PiRpcConnection.ts";
 import { decodeGetStateResponse, type PiRpcGetStateResponse } from "./PiRpcContract.ts";
 import * as PiRpcErrors from "./PiRpcErrors.ts";
@@ -68,6 +70,8 @@ export interface PiSessionManagerOptions {
   readonly args?: ReadonlyArray<string>;
   readonly environment?: NodeJS.ProcessEnv;
   readonly connect?: PiRpcConnector;
+  /** Injectable for lifecycle tests; production revokes through the active registry. */
+  readonly revokeMcpProviderSession?: (providerSessionId: string) => Effect.Effect<void>;
 }
 
 export interface PiSessionStartInput {
@@ -110,6 +114,8 @@ interface PiSessionContext {
   readonly connection: PiRpcConnection;
   readonly cursor: Ref.Ref<PiResumeCursor>;
   readonly closed: Ref.Ref<boolean>;
+  readonly mcpProviderSessionId: string | undefined;
+  readonly mcpLease: PiMcpSessionLease | undefined;
   readonly handle: PiSession;
 }
 
@@ -351,11 +357,14 @@ const makePiSessionManager = Effect.fn("makePiSessionManager")(function* (
     if (yield* Ref.getAndSet(context.closed, true)) {
       return;
     }
+    yield* context.connection.close;
     if (sessions.get(context.threadId) === context) {
       sessions.delete(context.threadId);
     }
     ownedSessions.delete(context);
-    yield* context.connection.close;
+    if (context.mcpLease) {
+      yield* context.mcpLease.close;
+    }
     yield* Scope.close(context.sessionScope, Exit.void);
   });
 
@@ -387,10 +396,13 @@ const makePiSessionManager = Effect.fn("makePiSessionManager")(function* (
     const cwd = normalizedPath(input.cwd ?? defaultCwd);
     const resumeCursor = yield* decodeResumeCursor(input, cwd);
     const expectedSessionId = resumeCursor?.sessionId ?? piSessionIdForThread(input.threadId);
+    const mcpProviderSession = McpProviderSession.readMcpProviderSession(input.threadId);
+    const mcpProviderSessionId = mcpProviderSession?.providerSessionId;
     const existing = sessions.get(input.threadId);
     if (
       existing &&
-      (resumeCursor === undefined || existing.handle.sessionId === expectedSessionId)
+      (resumeCursor === undefined || existing.handle.sessionId === expectedSessionId) &&
+      existing.mcpProviderSessionId === mcpProviderSessionId
     ) {
       return existing.handle;
     }
@@ -400,8 +412,21 @@ const makePiSessionManager = Effect.fn("makePiSessionManager")(function* (
 
     const sessionScope = yield* Scope.make("sequential");
     const started = Effect.gen(function* () {
+      const mcpLease = mcpProviderSession
+        ? yield* (
+            options.revokeMcpProviderSession === undefined
+              ? makePiMcpSessionLease(mcpProviderSession)
+              : makePiMcpSessionLease(mcpProviderSession, {
+                  revokeProviderSession: options.revokeMcpProviderSession,
+                })
+          ).pipe(
+            Effect.provideService(FileSystem.FileSystem, fileSystem),
+            Effect.provideService(Scope.Scope, sessionScope),
+          )
+        : undefined;
       const args = [
         ...(options.args ?? ["--approve"]),
+        ...(mcpLease === undefined ? [] : ["--extension", mcpLease.extensionPath]),
         "--mode",
         "rpc",
         "--session-dir",
@@ -433,6 +458,8 @@ const makePiSessionManager = Effect.fn("makePiSessionManager")(function* (
         connection,
         cursor: cursorRef,
         closed,
+        mcpProviderSessionId,
+        mcpLease,
         handle: undefined as unknown as PiSession,
       } satisfies PiSessionContext;
       const handle: PiSession = {
@@ -455,16 +482,8 @@ const makePiSessionManager = Effect.fn("makePiSessionManager")(function* (
     sessions.set(input.threadId, context);
     ownedSessions.add(context);
     yield* context.connection.exitCode.pipe(
-      Effect.flatMap(() =>
-        lifecycleLock.withPermit(
-          Effect.sync(() => {
-            if (sessions.get(context.threadId) === context) {
-              sessions.delete(context.threadId);
-            }
-          }),
-        ),
-      ),
-      Effect.forkIn(sessionScope),
+      Effect.flatMap(() => lifecycleLock.withPermit(closeContext(context))),
+      Effect.forkIn(managerScope),
     );
     return context.handle;
   });

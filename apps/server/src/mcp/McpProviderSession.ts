@@ -23,6 +23,15 @@ export function clearMcpProviderSession(threadId: ThreadId): void {
   sessionsByThread.delete(threadId);
 }
 
+export function clearMcpProviderSessionIfMatches(
+  threadId: ThreadId,
+  providerSessionId: string,
+): void {
+  if (sessionsByThread.get(threadId)?.providerSessionId === providerSessionId) {
+    sessionsByThread.delete(threadId);
+  }
+}
+
 export function clearAllMcpProviderSessions(): void {
   sessionsByThread.clear();
 }
