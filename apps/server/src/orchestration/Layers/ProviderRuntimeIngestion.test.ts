@@ -364,6 +364,176 @@ describe("ProviderRuntimeIngestion", () => {
     expect(thread.session?.lastError).toBe("turn failed");
   });
 
+  it("treats turn.aborted as a terminal interrupted turn and releases the thread", async () => {
+    const harness = await createHarness();
+    const threadId = asThreadId("thread-1");
+    const turnId = asTurnId("turn-aborted");
+    const readThread = async () =>
+      (await harness.readModel()).threads.find((entry) => entry.id === threadId);
+
+    harness.emit({
+      type: "turn.started",
+      eventId: asEventId("evt-turn-started-aborted"),
+      provider: ProviderDriverKind.make("codex"),
+      threadId,
+      turnId,
+      createdAt: "2026-01-01T00:00:01.000Z",
+    });
+    await harness.drain();
+    const started = await readThread();
+    expect(started?.session?.status).toBe("running");
+    expect(started?.session?.activeTurnId).toBe(turnId);
+
+    harness.emit({
+      type: "turn.aborted",
+      eventId: asEventId("evt-turn-aborted"),
+      provider: ProviderDriverKind.make("codex"),
+      threadId,
+      turnId,
+      createdAt: "2026-01-01T00:00:02.000Z",
+      payload: { reason: "Interrupted by user." },
+    });
+    await harness.drain();
+    const interrupted = await readThread();
+    expect(interrupted?.session?.status).toBe("interrupted");
+    expect(interrupted?.session?.activeTurnId).toBeNull();
+    expect(interrupted?.latestTurn?.turnId).toBe(turnId);
+    expect(interrupted?.latestTurn?.state).toBe("interrupted");
+
+    harness.emit({
+      type: "turn.started",
+      eventId: asEventId("evt-turn-started-after-abort"),
+      provider: ProviderDriverKind.make("codex"),
+      threadId,
+      turnId: asTurnId("turn-after-abort"),
+      createdAt: "2026-01-01T00:00:03.000Z",
+    });
+    await harness.drain();
+    const restarted = await readThread();
+    expect(restarted?.session?.status).toBe("running");
+    expect(restarted?.session?.activeTurnId).toBe(asTurnId("turn-after-abort"));
+  });
+
+  it("ignores duplicate and stale turn.aborted events after a turn is closed", async () => {
+    const harness = await createHarness();
+    const threadId = asThreadId("thread-1");
+    const firstTurnId = asTurnId("turn-aborted-idempotent");
+    const readThread = async () =>
+      (await harness.readModel()).threads.find((entry) => entry.id === threadId);
+
+    harness.emit({
+      type: "turn.started",
+      eventId: asEventId("evt-turn-started-aborted-idempotent"),
+      provider: ProviderDriverKind.make("codex"),
+      threadId,
+      turnId: firstTurnId,
+      createdAt: "2026-01-01T00:00:01.000Z",
+    });
+    await harness.drain();
+    const started = await readThread();
+    expect(started?.session?.activeTurnId).toBe(firstTurnId);
+
+    harness.emit({
+      type: "turn.aborted",
+      eventId: asEventId("evt-turn-aborted-idempotent"),
+      provider: ProviderDriverKind.make("codex"),
+      threadId,
+      turnId: firstTurnId,
+      createdAt: "2026-01-01T00:00:02.000Z",
+      payload: { reason: "Interrupted by user." },
+    });
+    await harness.drain();
+    const interrupted = await readThread();
+    expect(interrupted?.session?.status).toBe("interrupted");
+    expect(interrupted?.session?.activeTurnId).toBeNull();
+    expect(interrupted?.latestTurn?.state).toBe("interrupted");
+    expect(interrupted?.session?.updatedAt).toBe("2026-01-01T00:00:02.000Z");
+
+    harness.emit({
+      type: "turn.aborted",
+      eventId: asEventId("evt-turn-aborted-idempotent-duplicate"),
+      provider: ProviderDriverKind.make("codex"),
+      threadId,
+      turnId: firstTurnId,
+      createdAt: "2026-01-01T00:00:03.000Z",
+      payload: { reason: "Interrupted by user." },
+    });
+    await harness.drain();
+    const afterDuplicate = (await harness.readModel()).threads.find(
+      (entry) => entry.id === threadId,
+    );
+    expect(afterDuplicate?.session?.status).toBe("interrupted");
+    expect(afterDuplicate?.session?.activeTurnId).toBeNull();
+    expect(afterDuplicate?.session?.updatedAt).toBe("2026-01-01T00:00:02.000Z");
+    expect(afterDuplicate?.latestTurn?.turnId).toBe(firstTurnId);
+    expect(afterDuplicate?.latestTurn?.state).toBe("interrupted");
+
+    const secondTurnId = asTurnId("turn-after-aborted-duplicate");
+    harness.emit({
+      type: "turn.started",
+      eventId: asEventId("evt-turn-started-after-aborted-duplicate"),
+      provider: ProviderDriverKind.make("codex"),
+      threadId,
+      turnId: secondTurnId,
+      createdAt: "2026-01-01T00:00:04.000Z",
+    });
+    await harness.drain();
+    const restarted = await readThread();
+    expect(restarted?.session?.status).toBe("running");
+    expect(restarted?.session?.activeTurnId).toBe(secondTurnId);
+
+    harness.emit({
+      type: "turn.aborted",
+      eventId: asEventId("evt-turn-aborted-stale"),
+      provider: ProviderDriverKind.make("codex"),
+      threadId,
+      turnId: firstTurnId,
+      createdAt: "2026-01-01T00:00:05.000Z",
+      payload: { reason: "Late abort from the previous turn." },
+    });
+    await harness.drain();
+    const afterStale = (await harness.readModel()).threads.find((entry) => entry.id === threadId);
+    expect(afterStale?.session?.status).toBe("running");
+    expect(afterStale?.session?.activeTurnId).toBe(secondTurnId);
+    expect(afterStale?.latestTurn?.turnId).toBe(secondTurnId);
+    expect(afterStale?.latestTurn?.state).toBe("running");
+
+    harness.emit({
+      type: "turn.completed",
+      eventId: asEventId("evt-turn-completed-after-aborted-stale"),
+      provider: ProviderDriverKind.make("codex"),
+      threadId,
+      turnId: secondTurnId,
+      createdAt: "2026-01-01T00:00:06.000Z",
+      payload: { state: "completed" },
+    });
+    await harness.drain();
+    const completed = await readThread();
+    expect(completed?.session?.status).toBe("ready");
+    expect(completed?.session?.activeTurnId).toBeNull();
+    expect(completed?.latestTurn?.turnId).toBe(secondTurnId);
+    expect(completed?.latestTurn?.state).toBe("completed");
+
+    harness.emit({
+      type: "turn.aborted",
+      eventId: asEventId("evt-turn-aborted-stale-after-newer-completion"),
+      provider: ProviderDriverKind.make("codex"),
+      threadId,
+      turnId: firstTurnId,
+      createdAt: "2026-01-01T00:00:07.000Z",
+      payload: { reason: "Late abort from the previous turn." },
+    });
+    await harness.drain();
+    const afterNewerCompletion = (await harness.readModel()).threads.find(
+      (entry) => entry.id === threadId,
+    );
+    expect(afterNewerCompletion?.session?.status).toBe("ready");
+    expect(afterNewerCompletion?.session?.activeTurnId).toBeNull();
+    expect(afterNewerCompletion?.session?.updatedAt).toBe("2026-01-01T00:00:06.000Z");
+    expect(afterNewerCompletion?.latestTurn?.turnId).toBe(secondTurnId);
+    expect(afterNewerCompletion?.latestTurn?.state).toBe("completed");
+  });
+
   it("applies provider session.state.changed transitions directly", async () => {
     const harness = await createHarness();
     const waitingAt = "2026-01-01T00:00:00.000Z";

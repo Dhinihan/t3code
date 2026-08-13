@@ -1525,12 +1525,21 @@ const make = Effect.gen(function* () {
           case "turn.started":
             return !conflictsWithActiveTurn || conflictingTurnStartIsPendingTurnStart;
           case "turn.completed":
+          case "turn.aborted":
             if (conflictsWithActiveTurn || missingTurnForActiveTurn) {
               return false;
             }
             // Only the active turn may close the lifecycle state.
             if (activeTurnId !== null && eventTurnId !== undefined) {
               return sameId(activeTurnId, eventTurnId);
+            }
+            if (event.type === "turn.aborted" && activeTurnId === null) {
+              // Once the active turn is gone, an abort is only valid for the
+              // known running latest turn. This rejects duplicate aborts and
+              // stale aborts after a newer turn has already settled.
+              return thread.latestTurn === null
+                ? eventTurnId !== undefined
+                : thread.latestTurn.turnId === eventTurnId && thread.latestTurn.state === "running";
             }
             // No active turn tracked: accept only completions that name their
             // turn (covers a real completion whose turn.started was lost). An
@@ -1555,7 +1564,8 @@ const make = Effect.gen(function* () {
         event.type === "session.exited" ||
         event.type === "thread.started" ||
         event.type === "turn.started" ||
-        event.type === "turn.completed"
+        event.type === "turn.completed" ||
+        event.type === "turn.aborted"
       ) {
         const status = (() => {
           switch (event.type) {
@@ -1571,6 +1581,8 @@ const make = Effect.gen(function* () {
               return normalizeRuntimeTurnState(event.payload.state) === "failed"
                 ? "error"
                 : "ready";
+            case "turn.aborted":
+              return "interrupted";
             case "session.started":
             case "thread.started":
               // Provider thread/session start notifications can arrive during an
@@ -1581,7 +1593,9 @@ const make = Effect.gen(function* () {
         const nextActiveTurnId =
           event.type === "turn.started"
             ? (eventTurnId ?? null)
-            : event.type === "turn.completed" || event.type === "session.exited"
+            : event.type === "turn.completed" ||
+                event.type === "turn.aborted" ||
+                event.type === "session.exited"
               ? null
               : event.type === "session.state.changed" &&
                   !sessionStatusAllowsActiveTurn(
