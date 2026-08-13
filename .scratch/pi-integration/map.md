@@ -69,14 +69,18 @@ de `04`. Detalhes e ponteiros de código no ticket `12`.
   exclusiva por thread T3; o processo é criado sob demanda, reaproveitado
   enquanto ativo e encerrado após inatividade. Detalhes:
   [`08-topologia-de-processo.md`](issues/08-topologia-de-processo.md).
+- **Continuidade: thread T3 × sessão Pi:** vínculo estável 1:1 em namespace
+  isolado; T3 guarda a thread visível, Pi guarda seu contexto, e falhas de
+  retomada no MVP são explícitas, sem reconstrução automática. Detalhes:
+  [`09-continuidade-de-sessao.md`](issues/09-continuidade-de-sessao.md).
 
 ## Ainda não especificado
 
 Névoa dentro do escopo — visível, ainda não afiada o bastante para virar ticket:
 
-- **Fatiamento da implementação do driver + adapter Pi.** Só ganha forma depois
-  de `08`, `09` e `10` (topologia de processo, continuidade de sessão e
-  mapeamento de eventos). Provavelmente vira vários tickets de execução.
+- **Fatiamento da implementação do driver + adapter Pi.** Topologia e
+  continuidade estão decididas; só ganha forma depois de `10` fechar o
+  mapeamento de eventos. Provavelmente vira vários tickets de execução.
 - **Estratégia concreta de teste do adapter.** O que fixturar, quais transcripts
   de RPC gravar, onde ficam os test doubles do processo Pi. Depende de `01` e
   `10`.
