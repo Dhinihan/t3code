@@ -21,7 +21,6 @@ import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import * as Semaphore from "effect/Semaphore";
-import * as Stream from "effect/Stream";
 
 import * as PiCompatibility from "./PiCompatibility.ts";
 import { connectPiRpc, type PiRpcConnection } from "./PiRpcConnection.ts";
@@ -83,6 +82,7 @@ export interface PiSession {
   readonly cwd: string;
   readonly sessionDir: string;
   readonly request: PiRpcConnection["request"];
+  readonly send: PiRpcConnection["send"];
   readonly events: PiRpcConnection["events"];
   readonly stderr: PiRpcConnection["stderr"];
   /** Read the latest durable cursor without starting another process. */
@@ -441,6 +441,7 @@ const makePiSessionManager = Effect.fn("makePiSessionManager")(function* (
         cwd,
         sessionDir,
         request: connection.request,
+        send: connection.send,
         events: connection.events,
         stderr: connection.stderr,
         getResumeCursor: () => Ref.get(cursorRef),

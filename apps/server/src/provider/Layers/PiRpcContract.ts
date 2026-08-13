@@ -10,11 +10,12 @@
  *   - an event     `{ type: "agent_start" | ... | "extension_ui_request" }`
  *   - an extension UI request (also an event, handled by the host's UI policy)
  *
- * Decoding is deliberately TOLERANT: Effect Schema ignores unknown properties
- * on structs, so a future Pi release that adds fields or event types is a
- * non-event. It is STRICT only about the fields this ticket consumes — missing
- * `sessionId` in `get_state`, a malformed envelope, or a non-correlating `id`
- * are real incompatibilities and decode to `None`.
+ * Decoding is deliberately TOLERANT: response fields that are not consumed by
+ * the handshake are ignored, while event records retain their unknown fields
+ * for adapter mapping and diagnostics. A future Pi release that adds fields or
+ * event types is therefore non-fatal. It is STRICT only about the fields this
+ * ticket consumes — missing `sessionId` in `get_state`, a malformed envelope,
+ * or a non-correlating `id` are real incompatibilities and decode to `None`.
  */
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
@@ -40,6 +41,26 @@ export const PiRpcCommand = Schema.Union([
   Schema.Struct({ type: Schema.Literal("abort") }),
 ]);
 export type PiRpcCommand = typeof PiRpcCommand.Type;
+
+/** One-way host message used to cancel a blocking extension UI request. */
+export const PiRpcExtensionUiResponse = Schema.Union([
+  Schema.Struct({
+    type: Schema.Literal("extension_ui_response"),
+    id: Schema.String,
+    value: Schema.Unknown,
+  }),
+  Schema.Struct({
+    type: Schema.Literal("extension_ui_response"),
+    id: Schema.String,
+    confirmed: Schema.Boolean,
+  }),
+  Schema.Struct({
+    type: Schema.Literal("extension_ui_response"),
+    id: Schema.String,
+    cancelled: Schema.Literal(true),
+  }),
+]);
+export type PiRpcExtensionUiResponse = typeof PiRpcExtensionUiResponse.Type;
 
 // ---------------------------------------------------------------------------
 // Response envelope
@@ -90,16 +111,31 @@ export interface PiRpcGetStateResponse {
 // Events
 // ---------------------------------------------------------------------------
 
-const PiRpcEvent = Schema.Struct({
-  type: Schema.String,
-  // Extension UI requests are events, not responses. Keep the small set of
-  // fields consumed by the scoped-model bridge while continuing to ignore
-  // fields introduced by newer Pi releases.
-  id: Schema.optional(Schema.String),
-  method: Schema.optional(Schema.String),
-  statusKey: Schema.optional(Schema.String),
-  statusText: Schema.optional(Schema.String),
-});
+const PiRpcEvent = Schema.StructWithRest(
+  Schema.Struct({
+    type: Schema.String,
+    // Extension UI requests are events, not responses. Keep the small set of
+    // fields consumed by the scoped-model bridge while retaining all other
+    // fields for adapter mapping and diagnostics.
+    id: Schema.optional(Schema.String),
+    method: Schema.optional(Schema.String),
+    statusKey: Schema.optional(Schema.String),
+    statusText: Schema.optional(Schema.String),
+    // Preserve the provider payloads consumed by the adapter. These remain
+    // Unknown on purpose: event variants evolve independently of the envelope,
+    // and the adapter performs the small discriminated reads it needs.
+    assistantMessageEvent: Schema.optional(Schema.Unknown),
+    message: Schema.optional(Schema.Unknown),
+    toolCallId: Schema.optional(Schema.Unknown),
+    toolName: Schema.optional(Schema.Unknown),
+    args: Schema.optional(Schema.Unknown),
+    partialResult: Schema.optional(Schema.Unknown),
+    result: Schema.optional(Schema.Unknown),
+    isError: Schema.optional(Schema.Unknown),
+    willRetry: Schema.optional(Schema.Unknown),
+  }),
+  [Schema.Record(Schema.String, Schema.Unknown)],
+);
 
 export type PiRpcEvent = typeof PiRpcEvent.Type;
 

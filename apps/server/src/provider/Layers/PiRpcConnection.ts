@@ -45,6 +45,7 @@ export interface PiRpcConnection {
   readonly exitCode: Effect.Effect<ChildProcessSpawner.ExitCode, never>;
   readonly events: PiRpcProtocol.PiRpcProtocol["events"];
   readonly request: PiRpcProtocol.PiRpcProtocol["request"];
+  readonly send: PiRpcProtocol.PiRpcProtocol["send"];
   /** Last captured stderr diagnostic lines (best-effort, bounded). */
   readonly stderr: Effect.Effect<string>;
   /** Close the process (and its group) and wait for it to exit. Idempotent. */
@@ -166,6 +167,7 @@ export const connectPiRpc = Effect.fn("connectPiRpc")(function* (
     exitCode: Deferred.await(exitedDeferred),
     events: protocol.events,
     request: protocol.request,
+    send: protocol.send,
     stderr: Ref.get(stderrRef),
     close,
   } satisfies PiRpcConnection;

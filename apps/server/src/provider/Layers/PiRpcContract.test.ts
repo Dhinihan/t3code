@@ -130,6 +130,32 @@ describe("PiRpcContract", () => {
     assert.equal(event.statusText, '{"version":1,"models":[]}');
   });
 
+  it("retains the payloads required to map assistant, thinking, and tool events", () => {
+    const record = PiRpc.decodeWireRecord({
+      type: "message_update",
+      assistantMessageEvent: {
+        type: "text_delta",
+        contentIndex: 0,
+        delta: "hello",
+      },
+      toolCallId: "tool-1",
+      toolName: "bash",
+      args: { command: "pwd" },
+      futureField: { should: "remain ignored" },
+    });
+
+    const event = record as PiRpc.PiRpcEvent;
+    assert.deepEqual(event.assistantMessageEvent, {
+      type: "text_delta",
+      contentIndex: 0,
+      delta: "hello",
+    });
+    assert.equal(event.toolCallId, "tool-1");
+    assert.equal(event.toolName, "bash");
+    assert.deepEqual(event.args, { command: "pwd" });
+    assert.deepEqual(event.futureField, { should: "remain ignored" });
+  });
+
   it("decodes a prompt acceptance response", () => {
     const record = PiRpc.decodeWireRecord({
       id: "ticket07-04-abort-1",

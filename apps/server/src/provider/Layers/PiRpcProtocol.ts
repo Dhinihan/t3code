@@ -30,6 +30,7 @@ import {
   decodeWireRecordOption,
   type PiRpcCommand,
   type PiRpcEvent,
+  type PiRpcExtensionUiResponse,
   type PiRpcResponse,
 } from "./PiRpcContract.ts";
 import {
@@ -73,6 +74,8 @@ export interface PiRpcProtocol {
     command: PiRpcCommand,
     id: string,
   ) => Effect.Effect<PiRpcResponse, PiRpcErrors.PiRpcError>;
+  /** Send a host message that has no correlated response. */
+  readonly send: (message: PiRpcExtensionUiResponse) => Effect.Effect<void, PiRpcErrors.PiRpcError>;
   /** Stream of session/extension events, in arrival order. */
   readonly events: Stream.Stream<PiRpcEvent>;
   /** Close the protocol: fail pending, end the writer, stop the reader. */
@@ -196,6 +199,19 @@ export const makePiRpcProtocol = Effect.fn("makePiRpcProtocol")(function* (
     yield* Queue.end(incomingEvents);
   });
 
+  const writeRecord = Effect.fn("PiRpcProtocol.writeRecord")(function* (
+    record: unknown,
+  ): Effect.fn.Return<void, PiRpcErrors.PiRpcError> {
+    const terminated = yield* Ref.get(terminationHandled);
+    if (terminated) {
+      return yield* new PiRpcTerminatedError({});
+    }
+    const offered = yield* Queue.offer(outgoing, encoder.encode(`${encodeCommandLine(record)}\n`));
+    if (!offered) {
+      return yield* new PiRpcTerminatedError({});
+    }
+  });
+
   const requestCommand = Effect.fn("PiRpcProtocol.request")(function* (
     command: PiRpcCommand,
     id: string,
@@ -208,9 +224,8 @@ export const makePiRpcProtocol = Effect.fn("makePiRpcProtocol")(function* (
     }
     const deferred = yield* Deferred.make<PiRpcResponse, PiRpcErrors.PiRpcError>();
     yield* Ref.update(pending, (current) => new Map(current).set(id, { deferred }));
-    const encoded = encoder.encode(`${encodeCommandLine({ ...command, id })}\n`);
-    const offered = yield* Queue.offer(outgoing, encoded);
-    if (!offered) {
+    const offered = yield* writeRecord({ ...command, id }).pipe(Effect.exit);
+    if (offered._tag === "Failure") {
       // Queue is closed (terminated between the check and the offer). Clean
       // up and fail.
       yield* Ref.update(pending, (current) => {
@@ -218,7 +233,7 @@ export const makePiRpcProtocol = Effect.fn("makePiRpcProtocol")(function* (
         next.delete(id);
         return next;
       });
-      return yield* new PiRpcTerminatedError({});
+      return yield* Effect.failCause(offered.cause);
     }
     const timeoutInput = options.requestTimeout ?? "30 seconds";
     const awaited = yield* Deferred.await(deferred).pipe(
@@ -248,6 +263,7 @@ export const makePiRpcProtocol = Effect.fn("makePiRpcProtocol")(function* (
 
   return {
     request: requestCommand,
+    send: writeRecord,
     events: Stream.fromQueue(incomingEvents).pipe(Stream.catchCause(() => Stream.empty)),
     close,
   } satisfies PiRpcProtocol;

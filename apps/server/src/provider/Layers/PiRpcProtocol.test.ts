@@ -19,10 +19,22 @@ import { decodeGetStateResponse } from "./PiRpcContract.ts";
 import * as PiProtocol from "./PiRpcProtocol.ts";
 import { PiRpcRequestTimeoutError } from "./PiRpcErrors.ts";
 
+const decodeJson = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
+const isPiRpcRequestTimeoutError = Schema.is(PiRpcRequestTimeoutError);
+
 const makeHarness = () =>
   PiProtocol.makeInMemoryPiStdio().pipe(
     Effect.flatMap(({ stdio, peer }) =>
       PiProtocol.makePiRpcProtocol({ stdio }).pipe(Effect.map((protocol) => ({ protocol, peer }))),
+    ),
+  );
+
+const makeSendHarness = () =>
+  PiProtocol.makeInMemoryPiStdio().pipe(
+    Effect.flatMap(({ stdio, output }) =>
+      PiProtocol.makePiRpcProtocol({ stdio }).pipe(
+        Effect.map((protocol) => ({ protocol, output })),
+      ),
     ),
   );
 
@@ -118,6 +130,24 @@ it.effect("fails a request sent after termination instead of hanging", () =>
   }).pipe(Effect.scoped),
 );
 
+it.effect("sends a one-way extension UI cancellation without registering a pending request", () =>
+  Effect.gen(function* () {
+    const { protocol, output } = yield* makeSendHarness();
+    const lineFiber = yield* Stream.fromQueue(output).pipe(
+      Stream.take(1),
+      Stream.runCollect,
+      Effect.forkScoped,
+    );
+    yield* protocol.send({ type: "extension_ui_response", id: "ui-1", cancelled: true });
+    const lines = yield* Fiber.join(lineFiber);
+    assert.deepEqual(decodeJson(lines[0] ?? "{}"), {
+      type: "extension_ui_response",
+      id: "ui-1",
+      cancelled: true,
+    });
+  }).pipe(Effect.scoped),
+);
+
 it.live("times out a request whose response never arrives", () =>
   Effect.gen(function* () {
     const { stdio } = yield* PiProtocol.makeInMemoryPiStdio();
@@ -130,7 +160,7 @@ it.live("times out a request whose response never arrives", () =>
     assert.equal(result._tag, "Failure");
     if (result._tag === "Failure") {
       const cause = result.cause;
-      if (Schema.is(PiRpcRequestTimeoutError)(cause)) {
+      if (isPiRpcRequestTimeoutError(cause)) {
         assert.include(cause.message, "get_state");
       }
     }

@@ -71,6 +71,7 @@ const makeFakeConnector = (input: {
             success: true,
             data: states.shift() ?? states.at(-1),
           }),
+        send: () => Effect.void,
         stderr: Effect.succeed(""),
         close,
         exitCode: Deferred.await(exit),

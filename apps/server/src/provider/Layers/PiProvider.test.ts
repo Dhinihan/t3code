@@ -64,6 +64,7 @@ const connection = (input: {
     }
     return Effect.succeed(response as never);
   },
+  send: () => Effect.void,
   events: Stream.fromIterable(input.events as ReadonlyArray<never>),
   stderr: Effect.succeed(""),
   close: Effect.void,

@@ -128,6 +128,12 @@ em [`04-anatomia-do-driver-t3.md`](issues/04-anatomia-do-driver-t3.md) e
   stop, reaper ou crash. O `resumeCursor` versionado valida identidade,
   namespace e histórico; retomada impossível falha sem reconstruir contexto.
   Detalhes: [`16-sessoes-pi-e-continuidade.md`](issues/16-sessoes-pi-e-continuidade.md).
+- **17 — adapter Pi de turnos e eventos:** `PiAdapter` traduz o RPC de sessões
+  em `ProviderRuntimeEvent`, mantém `agent_settled` como terminal autoritativo,
+  aplica modelo/thinking in-session, preserva tools/subagentes como itens
+  genéricos e trata erros locais, abort, processo morto e UI bloqueante sem
+  travar a sessão. Detalhes:
+  [`17-adapter-pi-turnos-e-eventos.md`](issues/17-adapter-pi-turnos-e-eventos.md).
 
 ## Ainda não especificado
 
