@@ -32,6 +32,12 @@ export interface PiCompatibilityInput {
   };
 }
 
+/** Apply only the binary-version half of the shared Pi compatibility policy. */
+export function assessPiVersion(version: string): Result.Result<void, PiRpcCompatibilityError> {
+  const error = assessVersion(version);
+  return error === null ? Result.succeed(undefined) : Result.fail(error);
+}
+
 /**
  * Assess Pi compatibility. Returns `Success` with the confirmed session id
  * when both layers pass; `Failure` with a typed
@@ -40,9 +46,9 @@ export interface PiCompatibilityInput {
 export function assessPiCompatibility(
   input: PiCompatibilityInput,
 ): Result.Result<string, PiRpcCompatibilityError> {
-  const versionError = assessVersion(input.version);
-  if (versionError) {
-    return Result.fail(versionError);
+  const versionResult = assessPiVersion(input.version);
+  if (Result.isFailure(versionResult)) {
+    return Result.fail(versionResult.failure);
   }
   const sessionId = input.state.data.sessionId;
   if (typeof sessionId !== "string" || sessionId.length === 0) {

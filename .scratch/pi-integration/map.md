@@ -145,6 +145,13 @@ em [`04-anatomia-do-driver-t3.md`](issues/04-anatomia-do-driver-t3.md) e
   thread; o manager injeta `--extension` apenas no processo principal,
   preserva extensões pessoais e revoga/limpa no stop, handshake falho ou crash.
   Detalhes: [`19-mcp-t3-somente-no-pi-principal.md`](issues/19-mcp-t3-somente-no-pi-principal.md).
+- **22 — probe real de compatibilidade:** comando manual `pnpm probe:pi` verifica
+  a versão instalada, exercita o Pi real em sessão temporária (handshake,
+  catálogo, thinking, texto, ferramenta, abort, shutdown e resume), reutiliza
+  os decodificadores de produção e expõe novidades somente como nomes de
+  campos/eventos. Saída segura, sem regravação de fixtures e com limpeza
+  scoped. Detalhes:
+  [`22-probe-real-de-compatibilidade-pi.md`](issues/22-probe-real-de-compatibilidade-pi.md).
 
 ## Ainda não especificado
 

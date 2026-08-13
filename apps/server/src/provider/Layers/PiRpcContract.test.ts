@@ -168,6 +168,19 @@ describe("PiRpcContract", () => {
     assert.equal(response.success, true);
   });
 
+  it("decodes the thinking-level catalog through the production contract", () => {
+    const levels = PiRpc.decodeAvailableThinkingLevelsResponse({
+      id: "thinking-1",
+      type: "response",
+      command: "get_available_thinking_levels",
+      success: true,
+      data: { levels: ["off", "minimal", "xhigh"], futureFlag: true },
+    });
+
+    assert.equal(levels._tag, "Some");
+    if (levels._tag === "Some") assert.deepEqual(levels.value, ["off", "minimal", "xhigh"]);
+  });
+
   it("decodes a command error response", () => {
     const record = PiRpc.decodeWireRecord({
       id: "bad-model",
