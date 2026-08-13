@@ -2,6 +2,8 @@
 
 Estas são receitas opcionais para dirigir cenários específicos no Android. Escolha somente a receita pedida pela tarefa; o arquivo não é uma suíte obrigatória.
 
+Para fechar os casos que exigem um aparelho, uma rede ou observação manual, use o [wizard de gaps do MVP](../../../../scripts/verify-pi-mvp-gaps.sh).
+
 ## Baseline
 
 - Inicie o run com `helpers/verify-mobile-pi.sh launch`; ele faz bootstrap/reuso do SDK, ADB e AVD em cache, e valide a instância com `doctor`.
