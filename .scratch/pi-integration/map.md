@@ -134,6 +134,12 @@ em [`04-anatomia-do-driver-t3.md`](issues/04-anatomia-do-driver-t3.md) e
   genéricos e trata erros locais, abort, processo morto e UI bloqueante sem
   travar a sessão. Detalhes:
   [`17-adapter-pi-turnos-e-eventos.md`](issues/17-adapter-pi-turnos-e-eventos.md).
+- **18 — anexos de imagem até o Pi:** `PiAdapter` reutiliza o storage e a
+  resolução de anexos existentes, converte bytes para `images` JSONL em ordem,
+  permite prompt somente com imagem e rejeita MIME/conteúdo/modelo sem input de
+  imagem. Capacidade desconhecida permanece tolerada e erro do Pi deixa a
+  sessão recuperável. Detalhes:
+  [`18-anexos-de-imagem-ate-o-pi.md`](issues/18-anexos-de-imagem-ate-o-pi.md).
 - **MCP nativo do T3 somente no Pi principal:** extensão T3 sem imports com
   Streamable HTTP eager, wrapper temporário fora do projeto e bearer por
   thread; o manager injeta `--extension` apenas no processo principal,

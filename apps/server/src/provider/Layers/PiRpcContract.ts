@@ -20,6 +20,14 @@
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
+/** Base64 image content accepted by Pi's `prompt` RPC command. */
+export const PiRpcImageContent = Schema.Struct({
+  type: Schema.Literal("image"),
+  data: Schema.String,
+  mimeType: Schema.String,
+});
+export type PiRpcImageContent = typeof PiRpcImageContent.Type;
+
 // ---------------------------------------------------------------------------
 // Command surface — the minimum shared by probe and session spawn.
 // ---------------------------------------------------------------------------
@@ -37,7 +45,11 @@ export const PiRpcCommand = Schema.Union([
     type: Schema.Literal("set_thinking_level"),
     level: Schema.String,
   }),
-  Schema.Struct({ type: Schema.Literal("prompt"), message: Schema.String }),
+  Schema.Struct({
+    type: Schema.Literal("prompt"),
+    message: Schema.String,
+    images: Schema.optional(Schema.Array(PiRpcImageContent)),
+  }),
   Schema.Struct({ type: Schema.Literal("abort") }),
 ]);
 export type PiRpcCommand = typeof PiRpcCommand.Type;

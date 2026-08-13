@@ -40,6 +40,11 @@ import {
 } from "../Errors.ts";
 import type { ProviderAdapterShape } from "../Services/ProviderAdapter.ts";
 import type { PiRpcCommand, PiRpcEvent, PiRpcExtensionUiResponse } from "./PiRpcContract.ts";
+import {
+  loadPiImageContents,
+  piImageInputSupport,
+  type PiImageAttachmentReader,
+} from "./PiImageAttachments.ts";
 import type { PiSession, PiSessionManager, PiSessionManagerError } from "./PiSessionManager.ts";
 
 const PROVIDER = ProviderDriverKind.make("pi");
@@ -48,6 +53,8 @@ const BLOCKING_EXTENSION_UI_METHODS = new Set(["select", "confirm", "input", "ed
 export interface PiAdapterOptions {
   readonly sessionManager: PiSessionManager;
   readonly instanceId?: ProviderInstanceId;
+  /** Server-owned attachment storage and reader; absent only disables image turns. */
+  readonly attachmentReader?: PiImageAttachmentReader;
   /** Injectable id source for hermetic adapter tests. */
   readonly makeId?: () => string;
 }
@@ -869,25 +876,13 @@ export const makePiAdapter = Effect.fn("makePiAdapter")(function* (
     const requestedSelection = input.modelSelection ?? context.modelSelection;
     const modelError = validateModelSelection(requestedSelection);
     if (modelError !== undefined) return yield* modelError;
-    if (input.input?.trim().length === 0 || input.input === undefined) {
-      if ((input.attachments?.length ?? 0) === 0) {
-        return yield* new ProviderAdapterValidationError({
-          provider: PROVIDER,
-          operation: "sendTurn",
-          issue: "Pi turns require text input; image attachment support is not enabled yet.",
-        });
-      }
+    const text = input.input?.trim() ?? "";
+    const attachments = input.attachments ?? [];
+    if (text.length === 0 && attachments.length === 0) {
       return yield* new ProviderAdapterValidationError({
         provider: PROVIDER,
         operation: "sendTurn",
-        issue: "Pi image attachment support is not enabled yet.",
-      });
-    }
-    if (input.attachments !== undefined && input.attachments.length > 0) {
-      return yield* new ProviderAdapterValidationError({
-        provider: PROVIDER,
-        operation: "sendTurn",
-        issue: "Pi image attachment support is not enabled yet.",
+        issue: "Pi turns require text input or at least one image attachment.",
       });
     }
 
@@ -910,6 +905,44 @@ export const makePiAdapter = Effect.fn("makePiAdapter")(function* (
       context.session = { ...context.session, model: requestedSelection.model };
     }
 
+    const images =
+      attachments.length === 0
+        ? []
+        : yield* Effect.gen(function* () {
+            if (options.attachmentReader === undefined) {
+              return yield* new ProviderAdapterRequestError({
+                provider: PROVIDER,
+                method: "attachments/read",
+                detail:
+                  "Pi image attachments are unavailable because attachment storage is not configured.",
+              });
+            }
+
+            const state = yield* request(context, { type: "get_state" });
+            if (piImageInputSupport(state) === "unsupported") {
+              return yield* new ProviderAdapterValidationError({
+                provider: PROVIDER,
+                operation: "sendTurn",
+                issue: "The selected Pi model does not accept image input.",
+              });
+            }
+
+            return yield* loadPiImageContents({
+              attachments,
+              reader: options.attachmentReader,
+            }).pipe(
+              Effect.mapError(
+                (cause) =>
+                  new ProviderAdapterRequestError({
+                    provider: PROVIDER,
+                    method: "attachments/read",
+                    detail: cause.message,
+                    cause,
+                  }),
+              ),
+            );
+          });
+
     const turnId = context.activeTurnId ?? TurnId.make(makeId());
     const newTurn = context.activeTurnId === undefined;
     if (newTurn) {
@@ -926,7 +959,8 @@ export const makePiAdapter = Effect.fn("makePiAdapter")(function* (
     }
     const promptResult = yield* request(context, {
       type: "prompt",
-      message: input.input.trim(),
+      message: text,
+      ...(images.length === 0 ? {} : { images }),
     }).pipe(Effect.exit);
     if (Exit.isFailure(promptResult)) {
       const detail = causeMessage(promptResult.cause);

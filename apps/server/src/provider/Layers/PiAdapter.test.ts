@@ -13,6 +13,7 @@ import { createModelSelection } from "@t3tools/shared/model";
 
 import type { PiRpcCommand, PiRpcEvent, PiRpcExtensionUiResponse } from "./PiRpcContract.ts";
 import { PiRpcRequestError } from "./PiRpcErrors.ts";
+import type { PiImageAttachmentReader } from "./PiImageAttachments.ts";
 import type { PiResumeCursor, PiSession, PiSessionManager } from "./PiSessionManager.ts";
 import { makePiAdapter } from "./PiAdapter.ts";
 
@@ -29,7 +30,7 @@ interface PiSessionDouble {
 
 const makeSessionDouble = Effect.fn("makePiSessionDouble")(function* (
   threadId: ThreadId,
-  options: { readonly failCommand?: string } = {},
+  options: { readonly failCommand?: string; readonly stateModel?: unknown } = {},
 ): Effect.fn.Return<PiSessionDouble> {
   const eventQueue = yield* Queue.unbounded<PiRpcEvent, Cause.Done<void>>();
   const owned = yield* Ref.make(true);
@@ -64,6 +65,14 @@ const makeSessionDouble = Effect.fn("makePiSessionDouble")(function* (
           id: "pi-test-response",
           command: command.type,
           success: true,
+          ...(command.type === "get_state"
+            ? {
+                data: {
+                  sessionId: cursor.sessionId,
+                  ...(options.stateModel === undefined ? {} : { model: options.stateModel }),
+                },
+              }
+            : {}),
         };
       }),
     send: (message) =>
@@ -97,10 +106,16 @@ const makeSessionDouble = Effect.fn("makePiSessionDouble")(function* (
   };
 });
 
-const makeTestAdapter = (sessionDouble: PiSessionDouble) =>
+const makeTestAdapter = (
+  sessionDouble: PiSessionDouble,
+  options: { readonly attachmentReader?: PiImageAttachmentReader } = {},
+) =>
   makePiAdapter({
     sessionManager: sessionDouble.manager,
     instanceId: INSTANCE,
+    ...(options.attachmentReader === undefined
+      ? {}
+      : { attachmentReader: options.attachmentReader }),
     makeId: (() => {
       let index = 0;
       return () => `pi-test-id-${index++}`;
@@ -114,6 +129,138 @@ const startInput = (threadId: ThreadId) => ({
   cwd: "/tmp/project",
   runtimeMode: "full-access" as const,
 });
+
+const imageAttachment = {
+  type: "image" as const,
+  id: "pi-images-00000000-0000-4000-8000-000000000001",
+  name: "diagram.png",
+  mimeType: "image/png",
+  sizeBytes: 3,
+};
+
+const imageReader: PiImageAttachmentReader = {
+  attachmentsDir: "/tmp/pi-images",
+  readFile: () => Effect.succeed(Uint8Array.from([1, 2, 3])),
+};
+
+it.effect("sends text and ordered images through the Pi prompt command", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("pi-adapter-images");
+      const sessionDouble = yield* makeSessionDouble(threadId);
+      const adapter = yield* makeTestAdapter(sessionDouble, {
+        attachmentReader: imageReader,
+      });
+
+      yield* adapter.startSession(startInput(threadId));
+      yield* adapter.sendTurn({
+        threadId,
+        input: "describe this",
+        attachments: [imageAttachment],
+      });
+
+      assert.deepEqual(sessionDouble.requests, [
+        {
+          type: "get_state",
+        },
+        {
+          type: "prompt",
+          message: "describe this",
+          images: [{ type: "image", data: "AQID", mimeType: "image/png" }],
+        },
+      ]);
+    }),
+  ),
+);
+
+it.effect("allows a prompt containing only an image", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("pi-adapter-image-only");
+      const sessionDouble = yield* makeSessionDouble(threadId);
+      const adapter = yield* makeTestAdapter(sessionDouble, {
+        attachmentReader: imageReader,
+      });
+
+      yield* adapter.startSession(startInput(threadId));
+      yield* adapter.sendTurn({
+        threadId,
+        attachments: [imageAttachment],
+      });
+
+      assert.deepEqual(sessionDouble.requests.at(-1), {
+        type: "prompt",
+        message: "",
+        images: [{ type: "image", data: "AQID", mimeType: "image/png" }],
+      });
+    }),
+  ),
+);
+
+it.effect("rejects images when the current Pi model explicitly lacks image input", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("pi-adapter-no-image-input");
+      const sessionDouble = yield* makeSessionDouble(threadId, {
+        stateModel: { input: ["text"] },
+      });
+      const adapter = yield* makeTestAdapter(sessionDouble, {
+        attachmentReader: imageReader,
+      });
+
+      yield* adapter.startSession(startInput(threadId));
+      const error = yield* Effect.flip(
+        adapter.sendTurn({
+          threadId,
+          input: "inspect",
+          attachments: [imageAttachment],
+        }),
+      );
+
+      assert.equal(error._tag, "ProviderAdapterValidationError");
+      if (error._tag === "ProviderAdapterValidationError") {
+        assert.include(error.issue, "image input");
+      }
+      assert.deepEqual(sessionDouble.requests, [{ type: "get_state" }]);
+      assert.equal((yield* adapter.listSessions())[0]?.status, "ready");
+    }),
+  ),
+);
+
+it.effect("keeps the session recoverable when Pi rejects an image prompt", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("pi-adapter-image-error");
+      const sessionDouble = yield* makeSessionDouble(threadId, { failCommand: "prompt" });
+      const adapter = yield* makeTestAdapter(sessionDouble, {
+        attachmentReader: imageReader,
+      });
+      const eventsFiber = yield* adapter.streamEvents.pipe(
+        Stream.filter((event) => event.threadId === threadId),
+        Stream.takeUntil((event) => event.type === "turn.completed"),
+        Stream.runCollect,
+        Effect.forkScoped,
+      );
+      yield* Effect.yieldNow;
+
+      yield* adapter.startSession(startInput(threadId));
+      const error = yield* Effect.flip(
+        adapter.sendTurn({
+          threadId,
+          input: "this image prompt fails",
+          attachments: [imageAttachment],
+        }),
+      );
+      const events = yield* Fiber.join(eventsFiber);
+
+      assert.equal(error._tag, "ProviderAdapterRequestError");
+      assert.equal(events.at(-1)?.type, "turn.completed");
+      assert.equal(yield* adapter.hasSession(threadId), true);
+      assert.equal((yield* adapter.listSessions())[0]?.status, "ready");
+      assert.isUndefined((yield* adapter.listSessions())[0]?.activeTurnId);
+    }),
+  ),
+);
 
 it.effect("maps Pi events and settles only on agent_settled", () =>
   Effect.scoped(
