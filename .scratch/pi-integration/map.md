@@ -65,6 +65,9 @@ de `04`. Detalhes e ponteiros de código no ticket `12`.
   pairing usa `t3 pair --base-dir`. Prova simultânea em `14273`/`6233` contra
   vanilla em `3773`, com bancos e `environmentId` distintos. Detalhes:
   [`05-ambiente-t3-isolado.md`](issues/05-ambiente-t3-isolado.md).
+- **06 — APK dev na LAN:** dev build Android pelo perfil EAS `development`,
+  conectado ao T3 integrado pela LAN, com criação de thread real confirmada no
+  celular. Detalhes: [`06-apk-dev-na-lan.md`](issues/06-apk-dev-na-lan.md).
 - **Topologia de processo e ciclo de vida do Pi:** uma sessão Pi persistente e
   exclusiva por thread T3; o processo é criado sob demanda, reaproveitado
   enquanto ativo e encerrado após inatividade. Detalhes:
@@ -79,17 +82,24 @@ de `04`. Detalhes e ponteiros de código no ticket `12`.
   matam a sessão, input bloqueante futuro é cancelado com aviso e custo fica
   fora do MVP. Detalhes:
   [`10-mapeamento-de-eventos.md`](issues/10-mapeamento-de-eventos.md).
+- **11 — handshake e incompatibilidade:** o Pi não é enumerável
+  (`get_commands` são slash commands de extensão), então o critério é piso
+  semver `0.84.1` + `get_state` validado por schema, na mesma função chamada
+  pelo probe e pelo spawn. Probe velho vira `status: "error"` no padrão do
+  OpenCode — nunca `availability: "unavailable"`, termo reservado a driver
+  ausente. Decodificação tolerante: novidade se ignora, ausência derruba. Sem
+  teto de versão; manutenção = atualizou o Pi, roda a suíte. Detalhes:
+  [`11-handshake-e-versao.md`](issues/11-handshake-e-versao.md).
 
 ## Ainda não especificado
 
 Névoa dentro do escopo — visível, ainda não afiada o bastante para virar ticket:
 
-- **Fatiamento da implementação do driver + adapter Pi.** Topologia e
-  continuidade estão decididas; só ganha forma depois de `10` fechar o
-  mapeamento de eventos. Provavelmente vira vários tickets de execução.
-- **Estratégia concreta de teste do adapter.** O que fixturar, quais transcripts
-  de RPC gravar, onde ficam os test doubles do processo Pi. Depende de `01` e
-  `10`.
+- **Fatiamento da implementação do driver + adapter Pi.** Topologia,
+  continuidade, eventos e compatibilidade estão decididos; o que falta para
+  fatiar é `12`, porque a função de snapshot que carrega os modelos é a mesma
+  que carrega o status de versão decidido em `11`. Provavelmente vira vários
+  tickets de execução.
 - **Imagens até o Pi.** Depende de `01` responder se e como o RPC aceita
   conteúdo binário/MIME. Se aceitar, vira ticket de mapeamento do pipeline de
   anexos; se não aceitar, vira decisão sobre erro de backend.
