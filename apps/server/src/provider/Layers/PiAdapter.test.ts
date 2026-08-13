@@ -410,6 +410,58 @@ it.effect("maps Pi events and settles only on agent_settled", () =>
   ),
 );
 
+it.effect("preserves whitespace across assistant deltas and does not repeat the final text", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("pi-adapter-whitespace-deltas");
+      const sessionDouble = yield* makeSessionDouble(threadId);
+      const adapter = yield* makeTestAdapter(sessionDouble);
+      const eventsFiber = yield* adapter.streamEvents.pipe(
+        Stream.filter((event) => event.threadId === threadId),
+        Stream.takeUntil((event) => event.type === "turn.completed"),
+        Stream.runCollect,
+        Effect.forkScoped,
+      );
+
+      yield* adapter.startSession(startInput(threadId));
+      yield* adapter.sendTurn({ threadId, input: "preserve this" });
+      yield* sessionDouble.push({
+        type: "message_update",
+        assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "hello " },
+      });
+      yield* sessionDouble.push({
+        type: "message_update",
+        assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "world\n" },
+      });
+      yield* sessionDouble.push({
+        type: "message_end",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "hello world\n" }],
+          stopReason: "stop",
+        },
+      });
+      yield* sessionDouble.push({ type: "agent_settled" });
+
+      const events = yield* Fiber.join(eventsFiber);
+      const deltas = events.filter((event) => event.type === "content.delta");
+      assert.deepEqual(
+        deltas.map((event) => (event.type === "content.delta" ? event.payload.delta : "")),
+        ["hello ", "world\n"],
+      );
+      const completed = events.filter(
+        (event) =>
+          event.type === "item.completed" && event.payload.itemType === "assistant_message",
+      );
+      assert.equal(completed.length, 1);
+      assert.equal(completed[0]?.type, "item.completed");
+      if (completed[0]?.type === "item.completed") {
+        assert.equal(completed[0].payload.detail, "hello world\n");
+      }
+    }),
+  ),
+);
+
 it.effect("cancels blocking extension UI and keeps the Pi turn alive", () =>
   Effect.scoped(
     Effect.gen(function* () {

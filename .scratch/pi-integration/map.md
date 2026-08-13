@@ -160,6 +160,10 @@ em [`04-anatomia-do-driver-t3.md`](issues/04-anatomia-do-driver-t3.md) e
   campos/eventos. Saída segura, sem regravação de fixtures e com limpeza
   scoped. Detalhes:
   [`22-probe-real-de-compatibilidade-pi.md`](issues/22-probe-real-de-compatibilidade-pi.md).
+- **24 — preservar texto dos deltas do Pi:** conteúdo textual deixa de passar
+  por `trim()`, portanto espaços e quebras de linha sobrevivem às fronteiras
+  entre chunks e o texto final não é anexado outra vez. Detalhes:
+  [`24-pi-resposta-duplicada-por-trim-de-deltas.md`](issues/24-pi-resposta-duplicada-por-trim-de-deltas.md).
 
 ## Ainda não especificado
 

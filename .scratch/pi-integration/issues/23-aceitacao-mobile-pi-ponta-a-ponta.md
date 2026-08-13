@@ -37,3 +37,6 @@ como tickets específicos, em vez de serem escondidas na prova de aceitação.
   web, incluindo novo envio na mesma thread e ausência de processo órfão. A
   prova equivalente no celular fica nesta aceitação, junto da validação do
   ticket 24.
+- O ticket 24 preserva espaços e quebras de linha nos deltas do Pi e passou nos
+  testes focados do adapter. Falta repetir no celular a mensagem que antes
+  aparecia duplicada.

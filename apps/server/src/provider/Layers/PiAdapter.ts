@@ -124,6 +124,10 @@ function stringValue(value: unknown): string | undefined {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
 }
 
+function textValue(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
 function numberValue(value: unknown): number | undefined {
   return typeof value === "number" && Number.isInteger(value) ? value : undefined;
 }
@@ -459,7 +463,7 @@ export const makePiAdapter = Effect.fn("makePiAdapter")(function* (
     if (!Array.isArray(content)) return [];
     return content.flatMap((part, index) => {
       if (!isRecord(part)) return [];
-      const text = stringValue(part.text) ?? stringValue(part.thinking);
+      const text = textValue(part.text) ?? textValue(part.thinking);
       if (text === undefined) return [];
       return [
         {
@@ -690,7 +694,7 @@ export const makePiAdapter = Effect.fn("makePiAdapter")(function* (
               turnId,
               "assistant_message",
               contentIndex,
-              stringValue(update.delta) ?? "",
+              textValue(update.delta) ?? "",
             );
           } else {
             yield* ensureAssistantItem(context, turnId, "assistant_message", contentIndex);
@@ -706,7 +710,7 @@ export const makePiAdapter = Effect.fn("makePiAdapter")(function* (
               turnId,
               "reasoning",
               contentIndex,
-              stringValue(update.delta) ?? "",
+              textValue(update.delta) ?? "",
             );
           } else {
             yield* ensureAssistantItem(context, turnId, "reasoning", contentIndex);
