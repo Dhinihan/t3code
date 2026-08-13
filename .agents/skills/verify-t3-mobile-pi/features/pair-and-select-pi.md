@@ -1,13 +1,6 @@
-# Parear e selecionar o Pi
+# Receita: parear e selecionar o Pi
 
-O usuário consegue conectar o T3 Code Mobile a um backend isolado e escolher um modelo que o Pi realmente anunciou, sem cair no ambiente vanilla nem numa opção genérica sem escopo.
-
-## Sub-features
-
-- `pair-environment` — registra o origin e o token do backend correto.
-- `project-visible` — mostra o projeto seedado no picker mobile.
-- `pi-catalog` — mostra os modelos Pi scoped.
-- `model-selected` — salva `pi/openai-codex/gpt-5.6-sol` com `GPT-5.6 Sol · Full` na thread.
+Use esta receita quando a tarefa pedir o caminho de conexões, o picker de projeto ou a seleção de um modelo Pi.
 
 ## How to get to it (user POV)
 
@@ -28,7 +21,7 @@ Preconditions:
 - **Parear.** Preencha o origin completo `http://10.0.2.2:<server-port>` e o token que não foi persistido. A lista de projetos contém `T3 Code Pi verification`.
 - **Escolher projeto.** Toque semanticamente em `New task`, selecione o projeto seedado e avance para a thread nova.
 - **Escolher modelo.** Abra `Thread settings`. A árvore contém a seleção do provider Pi; escolha `pi/openai-codex/gpt-5.6-sol` e confirme o texto `GPT-5.6 Sol · Full`.
-- **Provar.** Rode `helpers/verify-mobile-pi.sh capture pair-and-model`. O XML mostra os handles da tela e o PNG mostra o app já conectado ao projeto isolado.
+- **Registrar.** Se a tarefa precisar de evidência visual, rode `helpers/verify-mobile-pi.sh capture pair-and-model`.
 
 ## Gotchas
 

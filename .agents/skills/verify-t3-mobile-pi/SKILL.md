@@ -1,13 +1,13 @@
 ---
 name: verify-t3-mobile-pi
-description: "Use for an Android end-to-end acceptance pass of T3 Code Mobile with the Pi provider: isolated pairing, scoped model, text and image, generic tools, main-Pi MCP, interruption, and resume. The skill provisions or reuses the Android runtime and cached Metro before driving the app."
+description: "Use when driving one requested T3 Code Mobile Android scenario with the Pi provider: bootstrap/reuse the runtime, pair, select a model, exercise text/image, inspect tools/MCP, or interrupt/resume. Load only the requested recipe; the skill also provides evidence and cleanup."
 ---
 
 # Verificar T3 Mobile com Pi
 
-Esta skill conduz uma execução real do APK `com.t3tools.t3code.dev` em um emulador Android, conectado a um backend T3 descartável e ao Pi instalado no host. Ela transforma o runtime Android em parte da execução: primeiro localiza/reutiliza um SDK e um device compatíveis; se eles não existirem, instala os componentes mínimos em cache e inicia um AVD próprio. Ela não usa setters internos nem endpoints de teste para declarar sucesso: o fluxo passa pelo pareamento, picker, composer e thread que uma pessoa usa.
+Esta skill é um playbook para dirigir um cenário Android escolhido pelo agente, usando o APK `com.t3tools.t3code.dev`, um backend T3 descartável e o Pi instalado no host. O agente escolhe uma receita conforme a solicitação; as demais ficam fora da execução. O runtime Android faz parte do playbook: primeiro localiza/reutiliza um SDK e um device compatíveis; se eles não existirem, instala os componentes mínimos em cache e inicia um AVD próprio. A interação passa pelo pareamento, picker, composer e thread que uma pessoa usa.
 
-Leia o [mapa de funcionalidades](features/README.md) antes de escolher o fluxo. A execução padrão cobre uma thread nova com texto e imagem; os outros arquivos do mapa cobrem tools, MCP e ciclo de interrupção/retomada.
+Consulte o [mapa de receitas](features/README.md) somente para localizar o procedimento pedido. Não execute as outras receitas por padrão.
 
 ## Bootstrap e launch
 
@@ -22,7 +22,7 @@ O cache Android fica fora do checkout, por padrão em `~/.cache/t3-mobile-pi/and
 
 Por segurança, sem `ADB_SERIAL` o helper inicia um AVD próprio mesmo que outro emulador esteja online. Use `REUSE_ANDROID_DEVICE=1` somente quando aquele device pertencer explicitamente à execução atual.
 
-Use o artefato existente, se compatível. O helper procura os outputs locais e o cache de builds antes de construir; se não encontrar um APK, `AUTO_BUILD_APK=1` (padrão) executa `expo run:android --variant development --no-bundler --no-install` contra o device recém-preparado. Forneça `APK_PATH` apenas para escolher um artefato específico. O candidato usado na aceitação foi:
+Use o artefato existente, se compatível. O helper procura os outputs locais e o cache de builds antes de construir; se não encontrar um APK, `AUTO_BUILD_APK=1` (padrão) executa `expo run:android --variant development --no-bundler --no-install` contra o device recém-preparado. Forneça `APK_PATH` apenas para escolher um artefato específico. Um artefato usado anteriormente, se ainda estiver disponível, pode ser selecionado assim:
 
 ```bash
 export APK_PATH='/tmp/vinicius/eas-cli-nodejs/eas-build-run-cache/440f643b-ed3a-4cfb-a052-2dd7e69fb4b4_0dc63813-60a5-4c88-9992-b694d9dbb8bb.apk'
@@ -103,14 +103,13 @@ adb -s "$ADB_SERIAL" shell am start -W \
 
 No app, preencha o origin `http://10.0.2.2:<server-port>` e o token recém-criado. Confirme que o projeto `T3 Code Pi verification` aparece. Depois dirija a UI por semântica: atualize a árvore com `uiautomator dump`, prefira `content-desc`, `text`, `resource-id` e os `bounds` do nó encontrado; não fixe coordenadas antes de inspecionar a árvore.
 
-Handles reais do mobile observados no fluxo:
+Handles úteis para dirigir o mobile:
 
 - home: `New task`;
 - thread nova: `Thread settings`, `Add attachment`, `Start task`;
 - thread existente: `Send`;
 - ferramentas de thread: `Open files`, `Open terminal`, `Open git controls`;
 - durante trabalho: texto `Working for ...` e o controle visual vermelho de interrupção;
-- modelo esperado: `GPT-5.6 Sol · Full` para `pi/openai-codex/gpt-5.6-sol`.
 
 Para preparar uma imagem real no picker sem depender da galeria do host:
 
@@ -118,11 +117,11 @@ Para preparar uma imagem real no picker sem depender da galeria do host:
 RUN_DIR='<run-dir>' "$HELPER" prepare-image "$PWD/apps/mobile/assets/android-icon-mark.png"
 ```
 
-Na UI, use `New task`, escolha o projeto, abra as configurações de thread e selecione `pi/openai-codex/gpt-5.6-sol` com o nível de thinking usado pela aceitação. Toque `Add attachment`, escolha `t3-wayfinder.png`, escreva uma instrução que peça a palavra `WAYFINDER` e envie por `Start task`. Aguarde o estado terminal e valide, no mesmo thread, o texto do usuário, a miniatura ou indicador de anexo e uma única resposta do assistente.
+Para a receita de texto e imagem, use `New task`, escolha o projeto, abra as configurações de thread e selecione o modelo Pi desejado. Toque `Add attachment`, escolha `t3-wayfinder.png`, escreva a instrução solicitada e envie por `Start task`. Aguarde o estado terminal; registre somente as evidências relevantes ao cenário escolhido.
 
-Para reproduzir as extensões e o lifecycle, siga os arquivos do mapa: solicite uma única chamada `subagent_spawn` seguida de `subagent_wait`, solicite `t3_preview_status` apenas no Pi principal, depois envie um comando bloqueante (`tail -f /dev/null`), interrompa pelo controle do mobile, confirme o estado `interrupted` e envie uma nova mensagem curta que responda `RESUME-OK`.
+Para a receita de tools/MCP, solicite as chamadas descritas no arquivo correspondente e observe o processo Pi principal e o subagente. Para a receita de lifecycle, envie um comando bloqueante (`tail -f /dev/null`), interrompa pelo controle do mobile e continue a thread conforme a solicitação.
 
-Depois de cada ação relevante, capture a mesma tela e a árvore semântica:
+Quando o cenário precisar de evidência visual, capture a tela e a árvore semântica depois da ação relevante:
 
 ```bash
 RUN_DIR='<run-dir>' "$HELPER" capture 01-pi-thread
@@ -130,25 +129,17 @@ RUN_DIR='<run-dir>' "$HELPER" capture 01-pi-thread
 
 ## Evidence
 
-Uma prova válida registra a ação e o resultado, não somente a tela final. Mantenha todos os artefatos dentro do `EVIDENCE_DIR` do run:
+Registre apenas a ação e o resultado do cenário escolhido, não uma suíte completa. Mantenha os artefatos usados dentro do `EVIDENCE_DIR` do run:
 
 - `android-runtime.txt`, `doctor.txt`, `server-environment.json`, `metro-status.txt` e logs do runtime/backend/Metro para identidade e launch; `metro-reused.txt` prova quando a execução aproveitou o processo/cache existente;
-- pares `*.ui.xml` + `*.png` para pareamento, picker, anexo, resposta, interrupção e retomada;
-- `db-proof.txt`, gerado depois de a thread terminar:
+- pares `*.ui.xml` + `*.png` para as telas que o cenário escolhido precisar;
+- `db-proof.txt` quando o cenário exigir confirmação do estado persistido:
 
   ```bash
   RUN_DIR='<run-dir>' "$HELPER" db-proof
   ```
 
-O `db-proof` registra somente contagens, estados, seleção de modelo truncada, summaries de atividades relevantes e nomes de RPC; não despeja corpos de mensagens nem tokens. O resultado funcional precisa mostrar, em conjunto:
-
-- um modelo Pi scoped no thread e o mesmo `thread_id` para a mensagem e a resposta;
-- uma mensagem do usuário com um anexo e exatamente uma mensagem do assistente para a primeira rodada;
-- `subagent_spawn`/`subagent_wait` como tool calls genéricas, `t3_preview_status` somente no log do Pi principal e ausência de `t3_*` no registro do subagente;
-- turno interrompido, novo envio na mesma thread com `RESUME-OK` e nenhum processo Pi órfão depois do settle;
-- ausência de `/quota` e `/hud` no fluxo.
-
-O arquivo [.scratch/pi-integration/issues/23-aceitacao-mobile-pi-ponta-a-ponta.md](../../../.scratch/pi-integration/issues/23-aceitacao-mobile-pi-ponta-a-ponta.md) é a referência histórica da aceitação já concluída; ele não substitui a nova captura da execução. O cleanup grava `cleanup.txt`; sem esse arquivo e sem as provas acima, a execução está incompleta.
+O `db-proof` registra somente contagens, estados, seleção de modelo truncada, summaries de atividades relevantes e nomes de RPC; não despeja corpos de mensagens nem tokens. O cleanup grava `cleanup.txt`.
 
 ## Cleanup
 
@@ -184,6 +175,6 @@ RUN_DIR='<run-dir>' "$HELPER" env
 RUN_DIR='<run-dir>' "$HELPER" cleanup
 ```
 
-Critério de conclusão da execução: `android-runtime.txt`, `doctor.txt`, `server-environment.json`, `metro-status.txt`, os pares de captura exigidos, `db-proof.txt` e `cleanup.txt` existem no `EVIDENCE_DIR`; o run não é chamado de validado quando qualquer uma dessas provas falta.
+Critério de conclusão: o procedimento solicitado foi executado até seu estado terminal, as evidências escolhidas para esse procedimento foram salvas e `cleanup.txt` confirma a limpeza. Não declare resultados para receitas que não foram executadas.
 
 Ao alterar o fluxo mobile, atualize também o mapa e rode `/maintain-verification-skill` para procurar entry points, handles ou estados reversos que tenham ficado obsoletos.
