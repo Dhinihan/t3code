@@ -65,6 +65,10 @@ de `04`. Detalhes e ponteiros de código no ticket `12`.
   pairing usa `t3 pair --base-dir`. Prova simultânea em `14273`/`6233` contra
   vanilla em `3773`, com bancos e `environmentId` distintos. Detalhes:
   [`05-ambiente-t3-isolado.md`](issues/05-ambiente-t3-isolado.md).
+- **Topologia de processo e ciclo de vida do Pi:** uma sessão Pi persistente e
+  exclusiva por thread T3; o processo é criado sob demanda, reaproveitado
+  enquanto ativo e encerrado após inatividade. Detalhes:
+  [`08-topologia-de-processo.md`](issues/08-topologia-de-processo.md).
 
 ## Ainda não especificado
 
@@ -83,8 +87,6 @@ Névoa dentro do escopo — visível, ainda não afiada o bastante para virar ti
 - **Subagentes sob o transporte do T3.** Como `subagent_spawn`/`wait`/`cancel`/
   `check`/`list` e seus resultados atravessam o adapter sem virar UI própria.
   Depende de `10`.
-- **Recuperação de falha e ausência de processos órfãos.** Thread recuperável
-  após crash do Pi ou do server. Depende de `08`.
 - **Modo `full-access` e aprovações.** O escopo diz para não adaptar aprovações;
   falta confirmar que o Pi nunca fica bloqueado esperando uma. Depende de `01`.
 

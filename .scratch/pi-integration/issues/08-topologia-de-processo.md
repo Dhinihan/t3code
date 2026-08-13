@@ -1,7 +1,7 @@
 # Topologia de processo e ciclo de vida do Pi
 
 Type: grilling
-Status: open
+Status: resolved
 Blocked by: 01, 04, 07
 
 ## Pergunta
@@ -27,3 +27,22 @@ Decidir, e junto com isso:
 - Custo de startup: se subir o Pi é caro (carregar extensões, catálogo de
   modelos), processo-por-turno pode ser inviável na prática. O ticket `07` deve
   ter medido isso.
+
+## Answer
+
+Cada thread T3 possui uma sessão Pi persistente e exclusiva, mas não um processo
+permanente. O processo Pi é criado sob demanda quando a thread precisa executar
+um turno, permanece associado à sessão enquanto há atividade e é encerrado pelo
+reaper após inatividade.
+
+O processo é recurso do scope da sessão ativa: fechar o scope deve encerrar o
+filho e aguardar sua saída. Reiniciar o servidor não tenta adotar processos
+antigos; o processo anterior termina com seu owner e um novo processo retoma a
+sessão persistida quando a thread voltar a ser usada. Assim, processo é estado
+efêmero de execução, enquanto o histórico da sessão Pi sobrevive a reaping,
+crash e restart.
+
+Essa topologia evita o custo de subir um processo a cada turno, não introduz um
+daemon compartilhado nem multiplexação entre threads e mantém a recuperação
+testável: uma thread reapada ou interrompida deve poder iniciar outro processo
+com a mesma sessão, sem processo órfão nem estado de execução preso.
