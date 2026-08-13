@@ -23,8 +23,9 @@ ticket resolve _uma_ coisa; nenhum ticket é "implementar a integração".
 **Domínio:** monorepo pnpm do T3 Code (Effect-TS). O ponto de entrada da
 integração é a SPI `ProviderDriver` em `apps/server/src/provider/` — um driver
 produz `snapshot` / `adapter` / `textGeneration`. `ProviderDriverKind` vive em
-`@t3tools/contracts` e é um tipo fechado, então um provider novo atravessa
-server + contracts + clients. Vocabulário do repo em `AGENTS.md`.
+`@t3tools/contracts`, mas é um slug branded aberto; uma instância de fork pode
+usar um kind novo sem estender uma union central. Vocabulário do repo em
+`AGENTS.md`.
 
 **Skills a consultar em toda sessão:** `/grilling` e `/domain-modeling` (padrão),
 `/research` para tickets AFK, `/prototype` para spikes, `/tdd` ao implementar.
@@ -46,15 +47,12 @@ server + contracts + clients. Vocabulário do repo em `AGENTS.md`.
   este: T3 home, porta, estado e pareamento mobile precisam ser separados.
 - **Idioma:** mapa, tickets e conversa em português.
 
-**Tensão conhecida a vigiar** _(atualizada — em grande parte desarmada)_: "fork
-rebaseável" parecia puxar contra "modelos espelhados". Verificado no código: os
-modelos do T3 são **dados, não enum** — `ServerProviderModel` é um Struct e o
-snapshot do provider carrega `models: Array(...)`; o Cursor já descobre o
-catálogo dinamicamente via ACP, e o nível de esforço cabe em
-`ModelCapabilities.optionDescriptors` como um `select`. Espelhar o Pi, portanto,
-**não exige tocar contracts**. O que continua atravessando contracts e clients é
-o `ProviderDriverKind` novo — o veredito sobre rebaseabilidade agora depende só
-de `04`. Detalhes e ponteiros de código no ticket `12`.
+**Tensão encerrada:** "fork rebaseável" não conflita com "modelos espelhados".
+Modelos são dados do snapshot, `ProviderDriverKind` é um slug aberto, e o escopo
+Pi pode ser descoberto por uma extensão-ponte em arquivos novos. O caminho
+funcional não exige alterar contracts nem listas fechadas dos clients. Detalhes
+em [`04-anatomia-do-driver-t3.md`](issues/04-anatomia-do-driver-t3.md) e
+[`12-modelos-na-ui-sem-quebrar-o-rebase.md`](issues/12-modelos-na-ui-sem-quebrar-o-rebase.md).
 
 ## Decisões até aqui
 
@@ -96,20 +94,17 @@ de `04`. Detalhes e ponteiros de código no ticket `12`.
   manual permanente fala com o Pi instalado e detecta drift antes da suíte,
   sem alterar fixtures automaticamente. Detalhes:
   [`13-suite-do-adapter-e-drift-do-pi.md`](issues/13-suite-do-adapter-e-drift-do-pi.md).
+- **Espelhar os modelos do Pi sem quebrar a rebaseabilidade:** snapshot dinâmico
+  a cada cinco minutos, mostrando `ctx.scopedModels` via extensão-ponte interna
+  e caindo para todos os modelos disponíveis quando não houver escopo. Slug é
+  `provider/modelId`, thinking é editável por turno e catálogo obsoleto falha
+  explicitamente enquanto solicita refresh. Detalhes:
+  [`12-modelos-na-ui-sem-quebrar-o-rebase.md`](issues/12-modelos-na-ui-sem-quebrar-o-rebase.md).
 
 ## Ainda não especificado
 
-Névoa dentro do escopo — visível, ainda não afiada o bastante para virar ticket:
-
-- **Fatiamento da implementação do driver + adapter Pi.** Topologia,
-  continuidade, eventos e compatibilidade estão decididos; o que falta para
-  fatiar é `12`, porque a função de snapshot que carrega os modelos é a mesma
-  que carrega o status de versão decidido em `11`. Provavelmente vira vários
-  tickets de execução.
-- **Imagens até o Pi.** Depende de `01` responder se e como o RPC aceita
-  conteúdo binário/MIME. Se aceitar, vira ticket de mapeamento do pipeline de
-  anexos; se não aceitar, vira decisão sobre erro de backend.
-- **MCP nativo do T3 apenas para o Pi principal.** Depende de `02`.
+A névoa atual foi graduada para tickets. Não há área conhecida dentro do escopo
+que ainda seja imprecisa demais para formular como pergunta.
 
 ## Fora de escopo
 
