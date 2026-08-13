@@ -1,8 +1,8 @@
 # Aceitação ponta a ponta: mobile na LAN conversando com o Pi
 
 Type: task
-Status: claimed
-Blocked by: 24
+Status: resolved
+Blocked by: —
 
 ## Pergunta
 
@@ -38,5 +38,29 @@ como tickets específicos, em vez de serem escondidas na prova de aceitação.
   prova equivalente no celular fica nesta aceitação, junto da validação do
   ticket 24.
 - O ticket 24 preserva espaços e quebras de linha nos deltas do Pi e passou nos
-  testes focados do adapter. Falta repetir no celular a mensagem que antes
-  aparecia duplicada.
+  testes focados do adapter. A repetição no celular também passou: o thread
+  persistiu uma única resposta `WAYFINDER`.
+
+## Answer
+
+A aceitação foi concluída no servidor isolado `14273`, sem tocar no T3 vanilla
+em `3773`, usando o APK de desenvolvimento no emulador Android conectado pela
+LAN/reverse ADB.
+
+- O picker mobile mostrou os modelos scoped do Pi; a thread foi salva com
+  `pi/openai-codex/gpt-5.6-sol` (`GPT-5.6 Sol · Full`).
+- Uma mensagem com texto e uma imagem `image/png` chegou ao mesmo thread e
+  respondeu `WAYFINDER`. O estado persistido contém uma mensagem do usuário
+  com um anexo e uma única mensagem do assistente — sem duplicação.
+- A extensão pessoal de subagentes executou `subagent_spawn` e
+  `subagent_wait`; o resultado entregue no mobile foi `SUBAGENT-RPC-OK` como
+  tool call genérica. O MCP nativo do T3 foi chamado pelo Pi principal via
+  `t3_preview_status`; o subagente não emitiu chamada `t3_*`.
+- Um `bash` bloqueante (`tail -f /dev/null`) foi interrompido pelo botão do
+  mobile. O turno terminou como `interrupted`, o processo filho desapareceu,
+  e um novo envio na mesma thread respondeu `RESUME-OK`.
+- Depois da conclusão não havia processo Pi nem processo filho órfão. Não foram
+  usados `/quota` ou `/hud`.
+
+Não foi necessário alterar código nesta aceitação; o runtime isolado recebeu
+somente a configuração do provider Pi necessária para o picker e a execução.

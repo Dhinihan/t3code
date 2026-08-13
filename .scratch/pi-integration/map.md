@@ -170,6 +170,11 @@ em [`04-anatomia-do-driver-t3.md`](issues/04-anatomia-do-driver-t3.md) e
   encerra o turno com erro acionável e libera a sessão para retry. Nenhuma thread
   T3 filha ou processo filho é criado. Detalhes:
   [`26-subagente-pi-spawn-abortado.md`](issues/26-subagente-pi-spawn-abortado.md).
+- **23 — aceitação mobile ponta a ponta:** APK de desenvolvimento conectado ao
+  T3 isolado pela LAN, modelo Pi scoped, texto com imagem, tool calls genéricas,
+  MCP somente no Pi principal, abort, retomada e ausência de processos órfãos
+  passaram no mesmo thread. Detalhes:
+  [`23-aceitacao-mobile-pi-ponta-a-ponta.md`](issues/23-aceitacao-mobile-pi-ponta-a-ponta.md).
 
 ## Ainda não especificado
 
