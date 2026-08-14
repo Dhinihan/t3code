@@ -362,17 +362,25 @@ stop_web_runner() {
 }
 
 wait_for_web_runner() {
-  for ((i = 0; i < 150; i += 1)); do
+  local deadline=$((SECONDS + 150))
+  while (( SECONDS < deadline )); do
     kill -0 "$WEB_RUNNER_PID" 2>/dev/null || {
       warn "o dev runner encerrou antes de ficar pronto; log sanitizado: $WEB_LOG"
       tail -n 30 "$WEB_LOG" 2>/dev/null || true
       return 1
     }
+    if grep -Fq "could not share on the tailnet" "$WEB_LOG"; then
+      warn "o Tailscale Serve falhou antes de o web ficar disponível; não prossigo com uma URL que pode responder 502"
+      tail -n 30 "$WEB_LOG" 2>/dev/null || true
+      return 1
+    fi
     WEB_SHARED_ORIGIN="$(awk '/shared on tailnet:/ {sub(/^.*shared on tailnet: /, ""); print; exit}' "$WEB_LOG")"
+    WEB_SHARED_ORIGIN="${WEB_SHARED_ORIGIN%/}"
     WEB_SERVER_PORT="$(sed -n 's/.*serverPort=\([0-9][0-9]*\).*/\1/p' "$WEB_LOG" | head -n 1)"
     WEB_PORT="$(sed -n 's/.*webPort=\([0-9][0-9]*\).*/\1/p' "$WEB_LOG" | head -n 1)"
     if [[ -n "$WEB_SHARED_ORIGIN" && -n "$WEB_SERVER_PORT" && -n "$WEB_PORT" ]] && \
-      curl -fsS --max-time 2 "http://127.0.0.1:$WEB_SERVER_PORT/.well-known/t3/environment" >/dev/null 2>&1; then
+      curl -fsS --max-time 2 "http://127.0.0.1:$WEB_PORT/" >/dev/null 2>&1 && \
+      curl -fsS --max-time 2 "$WEB_SHARED_ORIGIN/.well-known/t3/environment" >/dev/null 2>&1; then
       return 0
     fi
     sleep 1
