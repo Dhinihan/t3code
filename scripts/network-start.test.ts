@@ -13,5 +13,6 @@ it.effect("keeps the persistent network server on the established Tailscale port
     expect(rootPackageJson).toMatch(
       /"start:network": ".*--tailscale-serve --tailscale-serve-port 8443 .*"/,
     );
+    expect(rootPackageJson).toMatch(/"start:network": ".*--base-dir ~\/\.t3\/pi-travel .*"/);
   }).pipe(Effect.provide(NodeServices.layer)),
 );
