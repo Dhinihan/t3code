@@ -9,7 +9,7 @@
  */
 import * as NodePath from "node:path";
 
-import { ProviderDriverKind, type ServerProvider } from "@t3tools/contracts";
+import { PiSettings, ProviderDriverKind, type ServerProvider } from "@t3tools/contracts";
 import { HostProcessPlatform } from "@t3tools/shared/hostProcess";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -58,10 +58,8 @@ import {
 const DRIVER_KIND = ProviderDriverKind.make("pi");
 
 /** Driver-owned config; environment variables stay in the instance envelope. */
-export const PiDriverConfig = Schema.Struct({
-  binaryPath: Schema.String.pipe(Schema.withDecodingDefault(Effect.succeed(PI_PROVIDER_BINARY))),
-});
-export type PiDriverConfig = typeof PiDriverConfig.Type;
+export const PiDriverConfig = PiSettings;
+export type PiDriverConfig = PiSettings;
 
 const decodePiDriverConfig = Schema.decodeSync(PiDriverConfig);
 const PI_SESSION_DIRECTORY_NAME = "pi";
