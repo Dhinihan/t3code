@@ -118,6 +118,23 @@ export function parseChangeRequestUrl(targetUrl: string): ChangeRequestLink | nu
   return null;
 }
 
+/** The repository root behind a recognised change-request URL, without PR-specific state. */
+export function changeRequestRepositoryUrl(targetUrl: string): string | null {
+  const changeRequest = parseChangeRequestUrl(targetUrl);
+  if (changeRequest === null) return null;
+  const url = new URL(targetUrl);
+  const repositoryPath =
+    /^(.*?)\/-\/merge_requests\/\d+(?:\/|$)/iu.exec(url.pathname)?.[1] ??
+    /^(.*?)(?:\/pull\/\d+|\/-\/merge_requests\/\d+|\/pull-requests\/\d+|\/pullrequest\/\d+)(?:\/|$)/iu.exec(
+      url.pathname,
+    )?.[1];
+  if (!repositoryPath) return null;
+  url.pathname = repositoryPath;
+  url.search = "";
+  url.hash = "";
+  return url.toString();
+}
+
 function claim(host: string, match: RegExpExecArray | null): ChangeRequestLink | null {
   const repository = match?.[1];
   const number = Number(match?.[2]);
@@ -255,9 +272,17 @@ export function useOpenPrLink(threadRef?: ScopedThreadRef) {
   const openChangeRequest = useOpenChangeRequestLink(threadRef);
   return useCallback(
     (event: MouseEvent<HTMLElement>, prUrl: string, targetThreadRef?: ScopedThreadRef) => {
-      event.preventDefault();
       event.stopPropagation();
-      if (openChangeRequest(event, prUrl, targetThreadRef)) return true;
+      const openInBrowser = shouldOpenPullRequestExternally(event);
+      const isAnchor =
+        event.currentTarget instanceof HTMLAnchorElement && event.currentTarget.href.length > 0;
+      // A real link already knows how to cmd/ctrl+click. Leave its default
+      // action alone so the browser (or Electron's window-open handler) opens
+      // the host. Buttons have no href, so they still go through openExternal.
+      if (openInBrowser && isAnchor) return false;
+
+      event.preventDefault();
+      if (!openInBrowser && openChangeRequest(event, prUrl, targetThreadRef)) return true;
 
       const api = readLocalApi();
       if (!api) {
