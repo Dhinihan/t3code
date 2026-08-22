@@ -293,6 +293,7 @@ const runStartupPhase = <A, E, R>(phase: string, effect: Effect.Effect<A, E, R>)
 interface StartupOptions {
   readonly activate?: Effect.Effect<void>;
   readonly awaitAuxiliaryParked?: Effect.Effect<void>;
+  readonly headlessTailscaleConnectionString?: Effect.Effect<string | undefined>;
   readonly abort?: (error: ServerRuntimeStartupError) => Effect.Effect<void>;
 }
 
@@ -406,7 +407,10 @@ export const make = (options?: StartupOptions) =>
             Effect.ignoreCause({ log: true }),
           );
           if (serverConfig.startupPresentation === "headless") {
-            const accessInfo = yield* issueHeadlessServeAccessInfo();
+            const tailscaleConnectionString = options?.headlessTailscaleConnectionString
+              ? yield* options.headlessTailscaleConnectionString
+              : undefined;
+            const accessInfo = yield* issueHeadlessServeAccessInfo(tailscaleConnectionString);
             yield* runStartupPhase(
               "headless.output",
               Console.log(formatHeadlessServeOutput(accessInfo)),

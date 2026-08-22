@@ -114,7 +114,11 @@ import {
 import { orchestrationHttpApiLayer } from "./orchestration/http.ts";
 import * as NetService from "@t3tools/shared/Net";
 import * as RelayClient from "@t3tools/shared/relayClient";
-import { disableTailscaleServe, ensureTailscaleServe } from "@t3tools/tailscale";
+import {
+  disableTailscaleServe,
+  ensureTailscaleServe,
+  resolveTailscaleHttpsBaseUrl,
+} from "@t3tools/tailscale";
 import { forkParked, ServerActivation } from "./serverActivation.ts";
 
 // Effect's default preemptive shutdown waits 20s before finalizing request scopes.
@@ -474,6 +478,7 @@ export const makeServerLayer = Layer.unwrap(
     const activationLayer = Layer.succeed(ServerActivation, awaitActivation);
     const runtimeStateParked = yield* Deferred.make<void>();
     const tailscaleParked = yield* Deferred.make<void>();
+    const tailscaleConnectionString = yield* Deferred.make<string | undefined>();
     const cloudLinkParked = yield* Deferred.make<void>();
     const routesReady = yield* Deferred.make<void>();
     const launcherLayer = ServiceLauncherClient.layer;
@@ -528,11 +533,12 @@ export const makeServerLayer = Layer.unwrap(
               const server = yield* HttpServer.HttpServer;
               const address = server.address;
               if (typeof address === "string" || !("port" in address)) {
+                yield* Deferred.succeed(tailscaleConnectionString, undefined);
                 return null;
               }
 
               const localPort = address.port;
-              return yield* ensureTailscaleServe({
+              const configured = yield* ensureTailscaleServe({
                 localPort,
                 servePort: config.tailscaleServePort,
                 localHost: "127.0.0.1",
@@ -552,6 +558,24 @@ export const makeServerLayer = Layer.unwrap(
                   }).pipe(Effect.as(null)),
                 ),
               );
+              if (configured === null) {
+                yield* Deferred.succeed(tailscaleConnectionString, undefined);
+                return null;
+              }
+
+              const connectionString = yield* resolveTailscaleHttpsBaseUrl({
+                servePort: config.tailscaleServePort,
+              }).pipe(
+                Effect.map((url) => url ?? undefined),
+                Effect.catch((cause) =>
+                  Effect.logWarning("Failed to resolve the Tailscale HTTPS endpoint", {
+                    cause,
+                    servePort: config.tailscaleServePort,
+                  }).pipe(Effect.as(undefined)),
+                ),
+              );
+              yield* Deferred.succeed(tailscaleConnectionString, connectionString);
+              return configured;
             }),
             (configured) =>
               configured
@@ -645,6 +669,9 @@ export const makeServerLayer = Layer.unwrap(
     const runtimeServicesLive = ServerRuntimeStartup.layerWithOptions({
       activate: Deferred.succeed(activation, undefined).pipe(Effect.asVoid),
       abort: (error) => Deferred.die(activation, error).pipe(Effect.asVoid),
+      ...(config.tailscaleServeEnabled
+        ? { headlessTailscaleConnectionString: Deferred.await(tailscaleConnectionString) }
+        : {}),
       awaitAuxiliaryParked: Effect.all(
         [
           Deferred.await(runtimeStateParked),

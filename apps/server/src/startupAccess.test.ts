@@ -77,3 +77,23 @@ it("formats headless serve output with the connection string, token, pairing url
   expect(output).toContain("Pairing URL: http://192.168.1.42:3773/pair#token=PAIRCODE");
   assert.isTrue(output.includes("█") || output.includes("▀") || output.includes("▄"));
 });
+
+it("includes a Tailscale pairing URL when the server published one", () => {
+  const output = formatHeadlessServeOutput({
+    connectionString: "http://192.168.1.42:3773",
+    token: "PAIRCODE",
+    pairingUrl: "http://192.168.1.42:3773/pair#token=PAIRCODE",
+    tailscale: {
+      connectionString: "https://workstation.example.ts.net/",
+      pairingUrl: "https://workstation.example.ts.net/pair#token=PAIRCODE",
+    },
+  });
+
+  expect(output).toContain("Tailscale connection string: https://workstation.example.ts.net/");
+  expect(output).toContain(
+    "Tailscale pairing URL: https://workstation.example.ts.net/pair#token=PAIRCODE",
+  );
+  expect(output).toContain(
+    renderTerminalQrCode("https://workstation.example.ts.net/pair#token=PAIRCODE"),
+  );
+});

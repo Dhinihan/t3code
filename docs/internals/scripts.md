@@ -56,6 +56,11 @@ authenticated.
   web. Shared packages are consumed and bundled transitively rather than built separately.
 - `vp run build:desktop`: Builds the desktop pipeline (desktop plus server).
 - `vp run start`: Runs the production server (serves the built web app as static files).
+- `pnpm start:network`: Builds the server and web app, then runs the compiled server on LAN and
+  Tailscale. It binds to all interfaces, configures Tailscale Serve, stores durable fork state under
+  `~/.t3/pi`, and starts filesystem browsing at the user's home directory. The process has the same
+  filesystem access as the user who launched it. Startup prints direct and Tailscale pairing URLs
+  for the standard web, desktop, and mobile clients.
 - `vp check`: Vite+ format, lint, and type checks. This repo sets `typeCheck: false` in its lint
   options, so workspace type checking runs separately.
 - `vp run typecheck`: Strict TypeScript checks for all packages.

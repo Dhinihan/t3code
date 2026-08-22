@@ -113,7 +113,9 @@ npx t3 serve --tailscale-serve
 ```
 
 By default this configures Tailscale Serve on HTTPS port 443 and advertises
-`https://machine.tailnet.ts.net/`. Advanced users can choose a different HTTPS port:
+`https://machine.tailnet.ts.net/`. When the mapping succeeds, startup prints both the direct and
+Tailscale pairing URLs; the QR code uses the Tailscale URL. Advanced users can choose a different
+HTTPS port:
 
 ```bash
 npx t3 serve --tailscale-serve --tailscale-serve-port 8443

@@ -11,6 +11,10 @@ export interface HeadlessServeAccessInfo {
   readonly connectionString: string;
   readonly token: string;
   readonly pairingUrl: string;
+  readonly tailscale?: {
+    readonly connectionString: string;
+    readonly pairingUrl: string;
+  };
 }
 
 type NetworkInterfacesMap = ReturnType<typeof NodeOS.networkInterfaces>;
@@ -119,18 +123,26 @@ export const renderTerminalQrCode = (value: string, margin = 2): string => {
   return rows.join("\n");
 };
 
-export const formatHeadlessServeOutput = (accessInfo: HeadlessServeAccessInfo): string =>
-  [
+export const formatHeadlessServeOutput = (accessInfo: HeadlessServeAccessInfo): string => {
+  const qrPairingUrl = accessInfo.tailscale?.pairingUrl ?? accessInfo.pairingUrl;
+  return [
     "T3 Code server is ready.",
     `Connection string: ${accessInfo.connectionString}`,
+    ...(accessInfo.tailscale
+      ? [`Tailscale connection string: ${accessInfo.tailscale.connectionString}`]
+      : []),
     `Token: ${accessInfo.token}`,
     `Pairing URL: ${accessInfo.pairingUrl}`,
+    ...(accessInfo.tailscale ? [`Tailscale pairing URL: ${accessInfo.tailscale.pairingUrl}`] : []),
     "",
-    renderTerminalQrCode(accessInfo.pairingUrl),
+    renderTerminalQrCode(qrPairingUrl),
     "",
   ].join("\n");
+};
 
-export const issueHeadlessServeAccessInfo = Effect.fn("issueHeadlessServeAccessInfo")(function* () {
+export const issueHeadlessServeAccessInfo = Effect.fn("issueHeadlessServeAccessInfo")(function* (
+  tailscaleConnectionString?: string,
+) {
   const serverConfig = yield* ServerConfig;
   const httpServer = yield* HttpServer.HttpServer;
   const serverAuth = yield* EnvironmentAuth.EnvironmentAuth;
@@ -144,5 +156,13 @@ export const issueHeadlessServeAccessInfo = Effect.fn("issueHeadlessServeAccessI
     connectionString,
     token: issued.credential,
     pairingUrl: buildPairingUrl(connectionString, issued.credential),
+    ...(tailscaleConnectionString
+      ? {
+          tailscale: {
+            connectionString: tailscaleConnectionString,
+            pairingUrl: buildPairingUrl(tailscaleConnectionString, issued.credential),
+          },
+        }
+      : {}),
   } satisfies HeadlessServeAccessInfo;
 });
