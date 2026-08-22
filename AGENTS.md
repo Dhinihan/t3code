@@ -156,9 +156,9 @@ Full glossary with file links: `docs/internals/glossary.md`
 
 ## Agent skills
 
-### Issue tracker
+### Local notes
 
-Issues and specs are tracked as local Markdown files in `.scratch/`. See `docs/agents/issue-tracker.md`.
+Optional fork-local notes may live under the ignored `.scratch/` directory. Never stage or commit them. Active work follows **Plans and work artifacts** above.
 
 ### Triage labels
 

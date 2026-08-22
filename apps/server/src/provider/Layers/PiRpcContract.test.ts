@@ -4,9 +4,8 @@
  * through the production schemas and pins the "novidade se ignora, ausência
  * derruba" tolerance of ticket 11.
  *
- * Fixture provenance: Pi 0.84.1 captures from
- * `.scratch/pi-integration/assets/07-spike-rpc/transcripts/` and
- * `01-rpc-*.transcript.md`.
+ * Fixture provenance: curated Pi 0.84.1 captures recorded on 2026-08-12.
+ * Paths, ids, timestamps, credentials, and personal configuration were removed.
  */
 import { assert, describe, it } from "vite-plus/test";
 

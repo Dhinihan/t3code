@@ -1,2 +1,0 @@
-{"at":"2026-08-12T22:56:35.408Z","command":{"type":"prompt","message":"Use the built-in bash tool to run `sleep 8`. Do not answer until that command finishes.","id":"ticket07-04-abort-1"}}
-{"at":"2026-08-12T22:56:47.578Z","command":{"type":"abort","id":"ticket07-04-abort-2"}}

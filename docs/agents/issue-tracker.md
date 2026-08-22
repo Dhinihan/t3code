@@ -1,6 +1,6 @@
-# Issue tracker: Local Markdown
+# Local Markdown notes
 
-Issues and specs for this repo live as markdown files in `.scratch/`.
+`.scratch/` is an optional, ignored notebook for fork-local work. Never stage or commit it. Active maintainer work belongs in the GitHub issue or project item described in `AGENTS.md`.
 
 ## Conventions
 
@@ -10,9 +10,9 @@ Issues and specs for this repo live as markdown files in `.scratch/`.
 - Triage state is recorded as a `Status:` line near the top of each issue file (see `triage-labels.md` for the role strings)
 - Comments and conversation history append to the bottom of the file under a `## Comments` heading
 
-## When a skill says "publish to the issue tracker"
+## When a local workflow requests scratch notes
 
-Create a new file under `.scratch/<feature-slug>/` (creating the directory if needed).
+Create a new file under `.scratch/<feature-slug>/` (creating the directory if needed). Keep it untracked.
 
 ## When a skill says "fetch the relevant ticket"
 
