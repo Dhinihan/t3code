@@ -1,6 +1,4 @@
 // @effect-diagnostics nodeBuiltinImport:off
-import * as NodePath from "node:path";
-
 import type { ThreadId } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -9,12 +7,10 @@ import * as Scope from "effect/Scope";
 
 import * as McpProviderSession from "../../mcp/McpProviderSession.ts";
 import * as McpSessionRegistry from "../../mcp/McpSessionRegistry.ts";
+import { resolvePiExtensionAssetPath } from "../pi/PiExtensionAssets.ts";
 import { makePiT3McpExtensionWrapperSource, type PiT3McpConfig } from "../pi/PiT3McpExtension.ts";
 
-export const PI_T3_MCP_EXTENSION_PATH = NodePath.join(
-  import.meta.dirname,
-  "../pi/PiT3McpExtension.ts",
-);
+export const PI_T3_MCP_EXTENSION_PATH = resolvePiExtensionAssetPath("PiT3McpExtension.ts");
 
 export interface PiMcpSessionLease {
   readonly threadId: ThreadId;

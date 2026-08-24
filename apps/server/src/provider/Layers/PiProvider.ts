@@ -1,6 +1,5 @@
 // @effect-diagnostics nodeBuiltinImport:off
 import * as NodeCrypto from "node:crypto";
-import * as NodePath from "node:path";
 
 import * as Cause from "effect/Cause";
 import * as Data from "effect/Data";
@@ -41,11 +40,11 @@ import {
   makePiScopedModelsStatusKey,
   PI_SCOPED_MODELS_COMMAND,
 } from "../pi/PiScopedModelsExtension.ts";
+import { resolvePiExtensionAssetPath } from "../pi/PiExtensionAssets.ts";
 
 export const PI_PROVIDER_BINARY = "pi";
-export const PI_SCOPED_MODELS_EXTENSION_PATH = NodePath.join(
-  import.meta.dirname,
-  "../pi/PiScopedModelsExtension.ts",
+export const PI_SCOPED_MODELS_EXTENSION_PATH = resolvePiExtensionAssetPath(
+  "PiScopedModelsExtension.ts",
 );
 export const PI_VERSION_PROBE_TIMEOUT_MS = 4_000;
 export const PI_CATALOG_PROBE_TIMEOUT_MS = 10_000;

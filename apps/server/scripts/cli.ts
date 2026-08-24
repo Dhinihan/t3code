@@ -19,6 +19,7 @@ import { resolveCatalogDependencies } from "../../../scripts/lib/resolve-catalog
 import { fromJsonStringPretty } from "@t3tools/shared/schemaJson";
 import { fromYaml } from "@t3tools/shared/schemaYaml";
 import { resolveSpawnCommand } from "@t3tools/shared/shell";
+import { PI_EXTENSION_ASSET_NAMES } from "../src/provider/pi/PiExtensionAssets.ts";
 import serverPackageJson from "../package.json" with { type: "json" };
 import {
   ServerCliBuildAssetMissingError,
@@ -227,6 +228,7 @@ const publishCmd = Command.make(
         "dist/bin.mjs",
         "dist/service-launcher.mjs",
         "dist/client/index.html",
+        ...PI_EXTENSION_ASSET_NAMES.map((name) => `dist/pi/${name}`),
       ]) {
         const abs = path.join(serverDir, relPath);
         if (!(yield* fs.exists(abs))) {

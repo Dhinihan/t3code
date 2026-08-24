@@ -8,7 +8,7 @@ import { assert, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 
 import * as McpProviderSession from "../../mcp/McpProviderSession.ts";
-import { makePiMcpSessionLease } from "./PiMcpSession.ts";
+import { makePiMcpSessionLease, PI_T3_MCP_EXTENSION_PATH } from "./PiMcpSession.ts";
 
 const run = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   effect.pipe(Effect.provide(NodeServices.layer), Effect.scoped);
@@ -42,6 +42,8 @@ it.effect("leases an ephemeral wrapper and cleans the exact provider credential"
         const source = NodeFS.readFileSync(lease.extensionPath, "utf8");
         assert.include(source, config.endpoint);
         assert.include(source, config.authorizationHeader);
+        assert.include(source, PI_T3_MCP_EXTENSION_PATH);
+        assert.equal(NodeFS.existsSync(PI_T3_MCP_EXTENSION_PATH), true);
         assert.notInclude(source, "T3_MCP_BEARER_TOKEN");
 
         const replacement = makeConfig("provider-session-replacement");
