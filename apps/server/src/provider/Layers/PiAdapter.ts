@@ -87,6 +87,7 @@ interface ToolItemState {
   result: unknown;
   isError: boolean;
   completed: boolean;
+  lastUpdateSignature: string | undefined;
 }
 
 interface PiSessionContext {
@@ -166,6 +167,14 @@ function detailFromUnknown(value: unknown): string | undefined {
     if (parts.length > 0) return parts.join("\n");
   }
   return undefined;
+}
+
+function jsonSignature(value: unknown): string | undefined {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return undefined;
+  }
 }
 
 function toolResultText(value: unknown): string | undefined {
@@ -556,6 +565,7 @@ export const makePiAdapter = Effect.fn("makePiAdapter")(function* (
         result: event.result,
         isError: boolValue(event.isError) ?? false,
         completed: false,
+        lastUpdateSignature: undefined,
       };
       context.toolItems.set(toolCallId, item);
     } else {
@@ -565,6 +575,11 @@ export const makePiAdapter = Effect.fn("makePiAdapter")(function* (
       item.isError = boolValue(event.isError) ?? item.isError;
     }
     if (phase === "end") item.completed = true;
+    if (phase === "update") {
+      const signature = jsonSignature([item.args, item.partialResult, item.result, item.isError]);
+      if (signature !== undefined && signature === item.lastUpdateSignature) return;
+      item.lastUpdateSignature = signature;
+    }
     const cursorPiSubagentStartupAbort =
       phase === "end" && isCursorPiSubagentStartupAbort(context, item);
     if (cursorPiSubagentStartupAbort) {

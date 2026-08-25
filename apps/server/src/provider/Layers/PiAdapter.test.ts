@@ -410,6 +410,64 @@ it.effect("maps Pi events and settles only on agent_settled", () =>
   ),
 );
 
+it.effect("coalesces identical Pi tool updates while preserving changed progress", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("pi-adapter-tool-update-coalescing");
+      const sessionDouble = yield* makeSessionDouble(threadId);
+      const adapter = yield* makeTestAdapter(sessionDouble);
+      const eventsFiber = yield* adapter.streamEvents.pipe(
+        Stream.filter((event) => event.threadId === threadId),
+        Stream.takeUntil((event) => event.type === "turn.completed"),
+        Stream.runCollect,
+        Effect.forkScoped,
+      );
+
+      yield* adapter.startSession(startInput(threadId));
+      yield* adapter.sendTurn({ threadId, input: "wait for the subagent" });
+      yield* sessionDouble.push({
+        type: "tool_execution_start",
+        toolCallId: "wait-tool",
+        toolName: "subagent_wait",
+        args: { ids: ["sa-1"] },
+      });
+      yield* sessionDouble.push({
+        type: "tool_execution_update",
+        toolCallId: "wait-tool",
+        toolName: "subagent_wait",
+        partialResult: { pending: ["sa-1"] },
+      });
+      yield* sessionDouble.push({
+        type: "tool_execution_update",
+        toolCallId: "wait-tool",
+        toolName: "subagent_wait",
+        partialResult: { pending: ["sa-1"] },
+      });
+      yield* sessionDouble.push({
+        type: "tool_execution_update",
+        toolCallId: "wait-tool",
+        toolName: "subagent_wait",
+        partialResult: { pending: ["sa-1"], elapsedSeconds: 1 },
+      });
+      yield* sessionDouble.push({
+        type: "tool_execution_end",
+        toolCallId: "wait-tool",
+        toolName: "subagent_wait",
+        result: { status: "done" },
+        isError: false,
+      });
+      yield* sessionDouble.push({ type: "agent_settled" });
+
+      const events = yield* Fiber.join(eventsFiber);
+      const toolEvents = events.filter((event) => event.itemId?.includes("wait-tool"));
+      assert.deepEqual(
+        toolEvents.map((event) => event.type),
+        ["item.started", "item.updated", "item.updated", "item.completed"],
+      );
+    }),
+  ),
+);
+
 it.effect("preserves whitespace across assistant deltas and does not repeat the final text", () =>
   Effect.scoped(
     Effect.gen(function* () {
