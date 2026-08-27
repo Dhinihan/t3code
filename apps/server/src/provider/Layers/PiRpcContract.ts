@@ -28,6 +28,10 @@ export const PiRpcImageContent = Schema.Struct({
 });
 export type PiRpcImageContent = typeof PiRpcImageContent.Type;
 
+/** How Pi queues a prompt that arrives while the agent is still streaming. */
+export const PiRpcStreamingBehavior = Schema.Literals(["steer", "followUp"]);
+export type PiRpcStreamingBehavior = typeof PiRpcStreamingBehavior.Type;
+
 // ---------------------------------------------------------------------------
 // Command surface — the minimum shared by probe and session spawn.
 // ---------------------------------------------------------------------------
@@ -49,6 +53,12 @@ export const PiRpcCommand = Schema.Union([
     type: Schema.Literal("prompt"),
     message: Schema.String,
     images: Schema.optional(Schema.Array(PiRpcImageContent)),
+    /**
+     * Required by Pi whenever the agent is mid-run: without it the `prompt`
+     * fails with "Agent is already processing". Pi ignores it when idle, so the
+     * adapter sends it on every prompt rather than tracking Pi's stream state.
+     */
+    streamingBehavior: Schema.optional(PiRpcStreamingBehavior),
   }),
   Schema.Struct({ type: Schema.Literal("abort") }),
 ]);

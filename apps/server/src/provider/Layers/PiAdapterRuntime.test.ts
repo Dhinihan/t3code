@@ -115,11 +115,13 @@ it.live("sends the Pi image content shape across the headless JSONL boundary", (
           type: prompt.type,
           message: prompt.message,
           images: prompt.images,
+          streamingBehavior: prompt.streamingBehavior,
         },
         {
           type: "prompt",
           message: "describe this image",
           images: [{ type: "image", data: "AQID", mimeType: "image/png" }],
+          streamingBehavior: "steer",
         },
       );
 

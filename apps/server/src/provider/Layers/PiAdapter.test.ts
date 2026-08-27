@@ -167,6 +167,7 @@ it.effect("sends text and ordered images through the Pi prompt command", () =>
           type: "prompt",
           message: "describe this",
           images: [{ type: "image", data: "AQID", mimeType: "image/png" }],
+          streamingBehavior: "steer",
         },
       ]);
     }),
@@ -192,6 +193,7 @@ it.effect("allows a prompt containing only an image", () =>
         type: "prompt",
         message: "",
         images: [{ type: "image", data: "AQID", mimeType: "image/png" }],
+        streamingBehavior: "steer",
       });
     }),
   ),
@@ -258,6 +260,41 @@ it.effect("keeps the session recoverable when Pi rejects an image prompt", () =>
       assert.equal(yield* adapter.hasSession(threadId), true);
       assert.equal((yield* adapter.listSessions())[0]?.status, "ready");
       assert.isUndefined((yield* adapter.listSessions())[0]?.activeTurnId);
+    }),
+  ),
+);
+
+it.effect("steers a running turn instead of opening a new one on mid-turn sendTurn", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("pi-adapter-steer");
+      const sessionDouble = yield* makeSessionDouble(threadId);
+      const adapter = yield* makeTestAdapter(sessionDouble);
+      const eventsFiber = yield* adapter.streamEvents.pipe(
+        Stream.filter((event) => event.threadId === threadId),
+        Stream.takeUntil((event) => event.type === "turn.completed"),
+        Stream.runCollect,
+        Effect.forkScoped,
+      );
+      yield* Effect.yieldNow;
+
+      yield* adapter.startSession(startInput(threadId));
+      const turn = yield* adapter.sendTurn({ threadId, input: "start working" });
+
+      // The turn is still running (no agent_settled yet), so this folds into it.
+      const steered = yield* adapter.sendTurn({ threadId, input: "actually, be careful" });
+      assert.equal(String(steered.turnId), String(turn.turnId));
+
+      yield* sessionDouble.push({ type: "agent_settled" });
+      const events = yield* Fiber.join(eventsFiber);
+
+      assert.deepEqual(sessionDouble.requests, [
+        { type: "prompt", message: "start working", streamingBehavior: "steer" },
+        { type: "prompt", message: "actually, be careful", streamingBehavior: "steer" },
+      ]);
+      // One turn boundary for the whole run: the steer opened no second turn.
+      assert.equal(events.filter((event) => event.type === "turn.started").length, 1);
+      assert.equal(events.filter((event) => event.type === "turn.completed").length, 1);
     }),
   ),
 );

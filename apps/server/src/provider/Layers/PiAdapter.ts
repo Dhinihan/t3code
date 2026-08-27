@@ -1021,10 +1021,14 @@ export const makePiAdapter = Effect.fn("makePiAdapter")(function* (
       yield* updateSession(context, { status: "running", activeTurnId: turnId });
       yield* emitTurnStarted(context, turnId, requestedSelection?.model);
     }
+    // Pi rejects a prompt that lands mid-run unless it is told how to queue it,
+    // and ignores the field when idle. Sending "steer" unconditionally keeps the
+    // steering path working without our turn state having to agree with Pi's.
     const promptResult = yield* request(context, {
       type: "prompt",
       message: text,
       ...(images.length === 0 ? {} : { images }),
+      streamingBehavior: "steer",
     }).pipe(Effect.exit);
     if (Exit.isFailure(promptResult)) {
       const detail = causeMessage(promptResult.cause);
