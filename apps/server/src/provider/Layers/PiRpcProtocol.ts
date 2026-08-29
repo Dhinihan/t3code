@@ -44,6 +44,9 @@ import type * as PiRpcErrors from "./PiRpcErrors.ts";
 const decoder = new TextDecoder();
 const encoder = new TextEncoder();
 
+const DEFAULT_REQUEST_TIMEOUT = "30 seconds";
+const DEFAULT_PROMPT_REQUEST_TIMEOUT = "10 minutes";
+
 const decodeJsonLine = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
 const encodeCommandLine = Schema.encodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
 
@@ -63,6 +66,14 @@ export interface PiRpcProtocolOptions {
    * wedged Pi can never strand a turn.
    */
   readonly requestTimeout?: Duration.Input;
+  /**
+   * Deadline for `prompt`, which is the one command whose ack waits on model
+   * work: Pi answers it only after preflight, and preflight runs a full
+   * context compaction when the session is close to overflowing. That is
+   * minutes on a large thread, so the short deadline would fail a Pi that is
+   * working correctly.
+   */
+  readonly promptRequestTimeout?: Duration.Input;
 }
 
 export interface PiRpcProtocol {
@@ -235,7 +246,10 @@ export const makePiRpcProtocol = Effect.fn("makePiRpcProtocol")(function* (
       });
       return yield* Effect.failCause(offered.cause);
     }
-    const timeoutInput = options.requestTimeout ?? "30 seconds";
+    const timeoutInput =
+      command.type === "prompt"
+        ? (options.promptRequestTimeout ?? DEFAULT_PROMPT_REQUEST_TIMEOUT)
+        : (options.requestTimeout ?? DEFAULT_REQUEST_TIMEOUT);
     const awaited = yield* Deferred.await(deferred).pipe(
       Effect.onInterrupt(() =>
         Ref.update(pending, (current) => {

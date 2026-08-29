@@ -126,6 +126,10 @@ export const connectPiRpc = Effect.fn("connectPiRpc")(function* (
     terminationError: new PiRpcErrors.PiRpcTerminatedError({}),
     // A wedged Pi must never strand a turn: every request has a bounded wait.
     requestTimeout: "30 seconds",
+    // `prompt` is acked only after Pi's preflight, which runs auto-compaction
+    // against the model when the context is full. Thirty seconds fails a Pi
+    // that is compacting a large thread and still perfectly healthy.
+    promptRequestTimeout: "10 minutes",
   });
 
   const killProcessGroup = (signal: "SIGTERM" | "SIGKILL") =>

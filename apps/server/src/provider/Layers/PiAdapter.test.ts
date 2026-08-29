@@ -12,7 +12,7 @@ import { ProviderDriverKind, ProviderInstanceId, ThreadId, TurnId } from "@t3too
 import { createModelSelection } from "@t3tools/shared/model";
 
 import type { PiRpcCommand, PiRpcEvent, PiRpcExtensionUiResponse } from "./PiRpcContract.ts";
-import { PiRpcRequestError } from "./PiRpcErrors.ts";
+import { PiRpcRequestError, PiRpcRequestTimeoutError } from "./PiRpcErrors.ts";
 import type { PiImageAttachmentReader } from "./PiImageAttachments.ts";
 import type { PiResumeCursor, PiSession, PiSessionManager } from "./PiSessionManager.ts";
 import { makePiAdapter } from "./PiAdapter.ts";
@@ -30,11 +30,20 @@ interface PiSessionDouble {
 
 const makeSessionDouble = Effect.fn("makePiSessionDouble")(function* (
   threadId: ThreadId,
-  options: { readonly failCommand?: string; readonly stateModel?: unknown } = {},
+  options: {
+    readonly failCommand?: string;
+    readonly stateModel?: unknown;
+    /** Command whose ack never arrives, mimicking a Pi busy in preflight. */
+    readonly timeoutCommand?: string;
+    /** How many of those commands succeed before the deadline fires. */
+    readonly timeoutAfter?: number;
+    readonly stderr?: string;
+  } = {},
 ): Effect.fn.Return<PiSessionDouble> {
   const eventQueue = yield* Queue.unbounded<PiRpcEvent, Cause.Done<void>>();
   const owned = yield* Ref.make(true);
   const requests: Array<PiRpcCommand> = [];
+  const timeoutCounts = new Map<string, number>();
   const uiResponses: Array<PiRpcExtensionUiResponse> = [];
   const cursor: PiResumeCursor = {
     schemaVersion: 1,
@@ -54,6 +63,16 @@ const makeSessionDouble = Effect.fn("makePiSessionDouble")(function* (
     request: (command) =>
       Effect.gen(function* () {
         requests.push(command);
+        if (options.timeoutCommand === command.type) {
+          const seen = (timeoutCounts.get(command.type) ?? 0) + 1;
+          timeoutCounts.set(command.type, seen);
+          if (seen > (options.timeoutAfter ?? 0)) {
+            return yield* new PiRpcRequestTimeoutError({
+              command: command.type,
+              timeoutMs: 600_000,
+            });
+          }
+        }
         if (options.failCommand === command.type) {
           return yield* new PiRpcRequestError({
             command: command.type,
@@ -80,7 +99,7 @@ const makeSessionDouble = Effect.fn("makePiSessionDouble")(function* (
         uiResponses.push(message);
       }),
     events: Stream.fromQueue(eventQueue),
-    stderr: Effect.succeed(""),
+    stderr: Effect.succeed(options.stderr ?? ""),
     getResumeCursor: () => Effect.succeed(cursor),
     refresh: () => Effect.succeed(cursor),
     close: Effect.void,
@@ -260,6 +279,148 @@ it.effect("keeps the session recoverable when Pi rejects an image prompt", () =>
       assert.equal(yield* adapter.hasSession(threadId), true);
       assert.equal((yield* adapter.listSessions())[0]?.status, "ready");
       assert.isUndefined((yield* adapter.listSessions())[0]?.activeTurnId);
+    }),
+  ),
+);
+
+it.effect("announces a Pi compaction and closes it on the compacted thread state", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("pi-adapter-compaction");
+      const sessionDouble = yield* makeSessionDouble(threadId);
+      const adapter = yield* makeTestAdapter(sessionDouble);
+      const eventsFiber = yield* adapter.streamEvents.pipe(
+        Stream.filter((event) => event.threadId === threadId),
+        Stream.takeUntil((event) => event.type === "turn.completed"),
+        Stream.runCollect,
+        Effect.forkScoped,
+      );
+      yield* Effect.yieldNow;
+
+      yield* adapter.startSession(startInput(threadId));
+      const turn = yield* adapter.sendTurn({ threadId, input: "keep going" });
+      yield* sessionDouble.push({ type: "compaction_start", reason: "threshold" });
+      yield* sessionDouble.push({
+        type: "compaction_end",
+        reason: "threshold",
+        aborted: false,
+        result: { tokensBefore: 120000, estimatedTokensAfter: 20000 },
+      });
+      yield* sessionDouble.push({ type: "agent_settled" });
+      const events = yield* Fiber.join(eventsFiber);
+
+      const started = events.find((event) => event.type === "runtime.warning");
+      if (started?.type === "runtime.warning") {
+        assert.include(started.payload.message, "compacting");
+        // The notice belongs to the turn that is waiting on the compaction.
+        assert.equal(String(started.turnId), String(turn.turnId));
+      } else {
+        assert.fail("expected a compaction notice");
+      }
+
+      const compacted = events.find((event) => event.type === "thread.state.changed");
+      if (compacted?.type === "thread.state.changed") {
+        assert.equal(compacted.payload.state, "compacted");
+        assert.deepEqual(compacted.payload.detail, {
+          tokensBefore: 120000,
+          estimatedTokensAfter: 20000,
+        });
+      } else {
+        assert.fail("expected a compacted thread state");
+      }
+    }),
+  ),
+);
+
+it.effect("reports an aborted compaction instead of claiming the thread compacted", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("pi-adapter-compaction-aborted");
+      const sessionDouble = yield* makeSessionDouble(threadId);
+      const adapter = yield* makeTestAdapter(sessionDouble);
+      const eventsFiber = yield* adapter.streamEvents.pipe(
+        Stream.filter((event) => event.threadId === threadId),
+        Stream.takeUntil((event) => event.type === "turn.completed"),
+        Stream.runCollect,
+        Effect.forkScoped,
+      );
+      yield* Effect.yieldNow;
+
+      yield* adapter.startSession(startInput(threadId));
+      yield* adapter.sendTurn({ threadId, input: "keep going" });
+      yield* sessionDouble.push({ type: "compaction_start", reason: "overflow" });
+      yield* sessionDouble.push({ type: "compaction_end", reason: "overflow", aborted: true });
+      yield* sessionDouble.push({ type: "agent_settled" });
+      const events = yield* Fiber.join(eventsFiber);
+
+      assert.isUndefined(events.find((event) => event.type === "thread.state.changed"));
+      const notices = events.filter((event) => event.type === "runtime.warning");
+      assert.equal(notices.length, 2);
+      if (notices.at(-1)?.type === "runtime.warning") {
+        assert.include(notices.at(-1)?.payload.message, "aborted");
+      }
+    }),
+  ),
+);
+
+it.effect("aborts the Pi run when the prompt ack times out", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("pi-adapter-prompt-timeout");
+      const sessionDouble = yield* makeSessionDouble(threadId, {
+        timeoutCommand: "prompt",
+        stderr: "pi: compaction retry 2/3\n",
+      });
+      const adapter = yield* makeTestAdapter(sessionDouble);
+      const eventsFiber = yield* adapter.streamEvents.pipe(
+        Stream.filter((event) => event.threadId === threadId),
+        Stream.takeUntil((event) => event.type === "turn.completed"),
+        Stream.runCollect,
+        Effect.forkScoped,
+      );
+      yield* Effect.yieldNow;
+
+      yield* adapter.startSession(startInput(threadId));
+      const error = yield* Effect.flip(adapter.sendTurn({ threadId, input: "keep going" }));
+      const events = yield* Fiber.join(eventsFiber);
+
+      assert.equal(error._tag, "ProviderAdapterRequestError");
+      if (error._tag === "ProviderAdapterRequestError") {
+        // The Pi side of the story travels with the failure.
+        assert.include(error.detail, "pi stderr: pi: compaction retry 2/3");
+      }
+      // T3 declared the turn dead, so Pi is told to stop too.
+      assert.deepEqual(sessionDouble.requests.at(-1), { type: "abort" });
+      const completed = events.at(-1);
+      if (completed?.type === "turn.completed") {
+        assert.equal(completed.payload.state, "failed");
+        assert.include(completed.payload.errorMessage, "timed out");
+      } else {
+        assert.fail("expected a failed turn");
+      }
+      assert.equal((yield* adapter.listSessions())[0]?.status, "ready");
+    }),
+  ),
+);
+
+it.effect("leaves a running turn alone when a steer times out", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("pi-adapter-steer-timeout");
+      const sessionDouble = yield* makeSessionDouble(threadId, {
+        timeoutCommand: "prompt",
+        timeoutAfter: 1,
+      });
+      const adapter = yield* makeTestAdapter(sessionDouble);
+
+      yield* adapter.startSession(startInput(threadId));
+      yield* adapter.sendTurn({ threadId, input: "start working" });
+      const error = yield* Effect.flip(adapter.sendTurn({ threadId, input: "and be careful" }));
+
+      assert.equal(error._tag, "ProviderAdapterRequestError");
+      // The steer failed, but the turn behind it is still Pi's to finish.
+      assert.isFalse(sessionDouble.requests.some((command) => command.type === "abort"));
+      assert.isDefined((yield* adapter.listSessions())[0]?.activeTurnId);
     }),
   ),
 );

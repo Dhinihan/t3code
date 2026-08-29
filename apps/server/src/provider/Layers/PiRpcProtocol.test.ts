@@ -148,6 +148,33 @@ it.effect("sends a one-way extension UI cancellation without registering a pendi
   }).pipe(Effect.scoped),
 );
 
+it.live("keeps a prompt pending past the deadline that fails other commands", () =>
+  Effect.gen(function* () {
+    const { stdio, peer } = yield* PiProtocol.makeInMemoryPiStdio();
+    const protocol = yield* PiProtocol.makePiRpcProtocol({
+      stdio,
+      requestTimeout: "50 millis",
+      promptRequestTimeout: "30 seconds",
+    });
+    // Pi acks a prompt only after preflight, which may run a whole context
+    // compaction: the short deadline belongs to the local state commands.
+    const promptFiber = yield* Effect.forkScoped(
+      protocol.request({ type: "prompt", message: "hi" }, "req-prompt"),
+    );
+    const stateFiber = yield* Effect.forkScoped(
+      protocol.request({ type: "get_state" }, "req-state"),
+    );
+    const stateResult = yield* Fiber.join(stateFiber).pipe(Effect.exit);
+    assert.equal(stateResult._tag, "Failure");
+
+    // The prompt outlived the 50ms deadline; a late ack still resolves it.
+    yield* peer.push({ id: "req-prompt", type: "response", command: "prompt", success: true });
+    const response = yield* Fiber.join(promptFiber);
+    assert.equal(response.command, "prompt");
+    yield* protocol.close;
+  }).pipe(Effect.scoped),
+);
+
 it.live("times out a request whose response never arrives", () =>
   Effect.gen(function* () {
     const { stdio } = yield* PiProtocol.makeInMemoryPiStdio();

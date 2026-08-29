@@ -24,11 +24,13 @@ import {
   type ProviderSession,
 } from "@t3tools/contracts";
 import { getModelSelectionStringOptionValue } from "@t3tools/shared/model";
+import * as Cause from "effect/Cause";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import * as PubSub from "effect/PubSub";
+import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 
@@ -45,6 +47,7 @@ import {
   piImageInputSupport,
   type PiImageAttachmentReader,
 } from "./PiImageAttachments.ts";
+import { PiRpcRequestTimeoutError } from "./PiRpcErrors.ts";
 import type { PiSession, PiSessionManager, PiSessionManagerError } from "./PiSessionManager.ts";
 
 const PROVIDER = ProviderDriverKind.make("pi");
@@ -264,6 +267,15 @@ function currentTurn(ctx: PiSessionContext): TurnId | undefined {
   return ctx.activeTurnId;
 }
 
+const isProviderAdapterRequestError = Schema.is(ProviderAdapterRequestError);
+const isPiRpcRequestTimeoutError = Schema.is(PiRpcRequestTimeoutError);
+
+/** True when a request failed because Pi never answered it in time. */
+function isPiRequestTimeout(cause: Cause.Cause<unknown>): boolean {
+  const failure = Cause.squash(cause);
+  return isProviderAdapterRequestError(failure) && isPiRpcRequestTimeoutError(failure.cause);
+}
+
 function makeAdapterError(
   operation: string,
   threadId: ThreadId,
@@ -338,19 +350,39 @@ export const makePiAdapter = Effect.fn("makePiAdapter")(function* (
   const requestId = (context: PiSessionContext, command: string): string =>
     `pi-${context.threadId}-${command}-${context.requestSequence++}`;
 
+  /**
+   * Last Pi stderr lines. The connection keeps them off the protocol stream,
+   * so without this a failed command reports the T3 side of the story only.
+   */
+  const stderrTail = (context: PiSessionContext) =>
+    context.piSession.stderr.pipe(
+      Effect.map((text) => {
+        const lines = text
+          .split("\n")
+          .map((line) => line.trim())
+          .filter((line) => line.length > 0);
+        return lines.length === 0 ? undefined : lines.slice(-3).join(" | ").slice(-500);
+      }),
+    );
+
   const request = Effect.fn("PiAdapter.request")(function* (
     context: PiSessionContext,
     command: PiRpcCommand,
   ) {
     return yield* context.piSession.request(command, requestId(context, command.type)).pipe(
-      Effect.mapError(
-        (cause) =>
-          new ProviderAdapterRequestError({
+      Effect.catch((cause) =>
+        Effect.gen(function* () {
+          const diagnostics = yield* stderrTail(context);
+          return yield* new ProviderAdapterRequestError({
             provider: PROVIDER,
             method: command.type,
-            detail: causeMessage(cause),
+            detail:
+              diagnostics === undefined
+                ? causeMessage(cause)
+                : `${causeMessage(cause)} (pi stderr: ${diagnostics})`,
             cause,
-          }),
+          });
+        }),
       ),
     );
   });
@@ -724,6 +756,53 @@ export const makePiAdapter = Effect.fn("makePiAdapter")(function* (
     });
   });
 
+  /**
+   * Pi compacts inside the `prompt` preflight, so a full context compaction
+   * runs while T3 is still waiting for the prompt ack. Announcing the start is
+   * what keeps a multi-minute compaction from reading as a hung turn; the end
+   * lands on the same `compacted` thread state Claude and Codex report.
+   */
+  const handleCompactionStart = Effect.fn("PiAdapter.handleCompactionStart")(function* (
+    context: PiSessionContext,
+    event: PiRpcEvent,
+  ) {
+    const reason = stringValue(event.reason);
+    yield* emit({
+      ...(yield* makeEventBase({ threadId: context.threadId, turnId: currentTurn(context) })),
+      type: "runtime.warning",
+      payload: {
+        message: "Pi is compacting the conversation to fit its context window.",
+        ...(reason === undefined ? {} : { detail: { reason } }),
+      },
+    });
+  });
+
+  const handleCompactionEnd = Effect.fn("PiAdapter.handleCompactionEnd")(function* (
+    context: PiSessionContext,
+    event: PiRpcEvent,
+  ) {
+    const turnId = currentTurn(context);
+    if (boolValue(event.aborted) === true) {
+      yield* emit({
+        ...(yield* makeEventBase({ threadId: context.threadId, turnId })),
+        type: "runtime.warning",
+        payload: {
+          message: "Pi aborted its context compaction.",
+          ...(stringValue(event.reason) === undefined ? {} : { detail: { reason: event.reason } }),
+        },
+      });
+      return;
+    }
+    yield* emit({
+      ...(yield* makeEventBase({ threadId: context.threadId, turnId })),
+      type: "thread.state.changed",
+      payload: {
+        state: "compacted",
+        ...(isRecord(event.result) ? { detail: event.result } : {}),
+      },
+    });
+  });
+
   const handleEvent = Effect.fn("PiAdapter.handleEvent")(function* (
     context: PiSessionContext,
     event: PiRpcEvent,
@@ -795,6 +874,12 @@ export const makePiAdapter = Effect.fn("makePiAdapter")(function* (
         break;
       case "extension_ui_request":
         yield* handleExtensionUiRequest(context, event);
+        break;
+      case "compaction_start":
+        yield* handleCompactionStart(context, event);
+        break;
+      case "compaction_end":
+        yield* handleCompactionEnd(context, event);
         break;
       case "agent_start":
       case "turn_start":
@@ -1031,7 +1116,7 @@ export const makePiAdapter = Effect.fn("makePiAdapter")(function* (
       streamingBehavior: "steer",
     }).pipe(Effect.exit);
     if (Exit.isFailure(promptResult)) {
-      const detail = causeMessage(promptResult.cause);
+      const detail = causeMessage(Cause.squash(promptResult.cause));
       if (newTurn) {
         context.activeTurnId = undefined;
         yield* updateSession(context, { status: "ready" }, true);
@@ -1040,6 +1125,13 @@ export const makePiAdapter = Effect.fn("makePiAdapter")(function* (
           type: "turn.completed",
           payload: { state: "failed", errorMessage: detail },
         });
+        // We just told the user this turn is dead. If Pi went silent rather
+        // than answering, make it agree instead of leaving it running work
+        // nobody is watching. A steer that times out is left alone: the turn
+        // it belongs to is still legitimately running.
+        if (isPiRequestTimeout(promptResult.cause)) {
+          yield* request(context, { type: "abort" }).pipe(Effect.exit);
+        }
       }
       return yield* Effect.failCause(promptResult.cause);
     }
