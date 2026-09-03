@@ -94,6 +94,7 @@ it.live("materializes an explicit Pi provider instance without a legacy provider
       ProviderDriverKind.make("grok"),
       ProviderDriverKind.make("opencode"),
       ProviderDriverKind.make("pi"),
+      ProviderDriverKind.make("antigravity"),
     ]);
   }).pipe(Effect.provide(PiDriverTestLayer)),
 );

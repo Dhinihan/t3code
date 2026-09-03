@@ -1,7 +1,7 @@
 import { TextGenerationError } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 
-import type { TextGenerationShape } from "./TextGeneration.ts";
+import type * as TextGeneration from "./TextGeneration.ts";
 
 export const PI_TEXT_GENERATION_UNSUPPORTED_DETAIL =
   "Pi does not provide auxiliary text generation. Choose another provider in Settings → Text generation.";
@@ -28,10 +28,10 @@ const unsupported = (operation: TextGenerationOperation) =>
  * deterministic and prevents an auxiliary request from sharing a thread's
  * durable Pi session.
  */
-export const makePiTextGeneration = (): Effect.Effect<TextGenerationShape> =>
+export const makePiTextGeneration = (): Effect.Effect<TextGeneration.TextGeneration["Service"]> =>
   Effect.succeed({
     generateCommitMessage: () => unsupported("generateCommitMessage"),
     generatePrContent: () => unsupported("generatePrContent"),
     generateBranchName: () => unsupported("generateBranchName"),
     generateThreadTitle: () => unsupported("generateThreadTitle"),
-  } satisfies TextGenerationShape);
+  } satisfies TextGeneration.TextGeneration["Service"]);
