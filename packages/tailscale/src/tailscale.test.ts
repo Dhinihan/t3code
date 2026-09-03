@@ -9,6 +9,7 @@ import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
 import { ChildProcessSpawner } from "effect/unstable/process";
 
+import { resolveTailscaleHttpsBaseUrl } from "./index.ts";
 import {
   buildTailscaleHttpsBaseUrl,
   disableTailscaleServe,
@@ -167,6 +168,17 @@ describe("tailscale", () => {
       );
     }),
   );
+
+  it.effect("resolves the public HTTPS base URL from tailscale status", () => {
+    const layer = mockSpawnerLayer(() => ({ stdout: tailscaleStatusJson }));
+
+    return Effect.gen(function* () {
+      const baseUrl = yield* resolveTailscaleHttpsBaseUrl({ servePort: 8443 }).pipe(
+        Effect.provide(layer),
+      );
+      assert.equal(baseUrl, "https://desktop.tail.ts.net:8443/");
+    });
+  });
 
   it.effect("reads tailscale status through the process spawner service", () => {
     const layer = mockSpawnerLayer((command, args) => {
