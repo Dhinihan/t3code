@@ -38,10 +38,7 @@ import {
   type PiImageAttachmentReader,
 } from "../Layers/PiImageAttachments.ts";
 import { makeManagedServerProvider } from "../makeManagedServerProvider.ts";
-import {
-  makeManualOnlyProviderMaintenanceCapabilities,
-  makeStaticProviderMaintenanceResolver,
-} from "../providerMaintenance.ts";
+import { makeManualOnlyProviderMaintenanceCapabilities } from "../providerMaintenance.ts";
 import type { ServerProviderDraft } from "../providerSnapshot.ts";
 import {
   defaultProviderContinuationIdentity,
@@ -64,12 +61,10 @@ export type PiDriverConfig = PiSettings;
 const decodePiDriverConfig = Schema.decodeSync(PiDriverConfig);
 const PI_SESSION_DIRECTORY_NAME = "pi";
 
-const UPDATE = makeStaticProviderMaintenanceResolver(
-  makeManualOnlyProviderMaintenanceCapabilities({
-    provider: DRIVER_KIND,
-    packageName: null,
-  }),
-);
+const MAINTENANCE_CAPABILITIES = makeManualOnlyProviderMaintenanceCapabilities({
+  provider: DRIVER_KIND,
+  packageName: null,
+});
 
 export type PiDriverEnv =
   | BackgroundPolicy.BackgroundPolicy
@@ -198,7 +193,6 @@ export const PiDriver: ProviderDriver<PiDriverConfig, PiDriverEnv> = {
         } satisfies PiImageAttachmentReader,
       });
       const textGeneration = yield* makePiTextGeneration();
-      const maintenanceCapabilities = UPDATE.resolve({ binaryPath, env: processEnv });
       const snapshotSettings = makeProviderSnapshotSettingsSource(providerSettings, serverSettings);
       const checkProvider = checkPiProviderStatus(providerSettings).pipe(
         Effect.map(stampIdentity),
@@ -208,7 +202,7 @@ export const PiDriver: ProviderDriver<PiDriverConfig, PiDriverEnv> = {
       const snapshot = yield* makeManagedServerProvider<
         ProviderSnapshotSettings<PiProviderSettings>
       >({
-        maintenanceCapabilities,
+        resolveMaintenance: () => Effect.succeed(MAINTENANCE_CAPABILITIES),
         getSettings: snapshotSettings.getSettings,
         streamSettings: snapshotSettings.streamSettings,
         haveSettingsChanged: haveProviderSnapshotSettingsChanged,
