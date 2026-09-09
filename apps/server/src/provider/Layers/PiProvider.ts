@@ -18,6 +18,7 @@ import {
   TrimmedNonEmptyString,
   type ModelCapabilities,
   type ServerProviderModel,
+  type ServerProviderSkill,
 } from "@t3tools/contracts";
 import { HostProcessPlatform } from "@t3tools/shared/hostProcess";
 import { createModelCapabilities } from "@t3tools/shared/model";
@@ -31,9 +32,15 @@ import {
   type CommandResult,
   type ServerProviderDraft,
 } from "../providerSnapshot.ts";
-import { assessPiCompatibility, MINIMUM_PI_VERSION } from "./PiCompatibility.ts";
+import { assessPiCompatibility } from "./PiCompatibility.ts";
 import { connectPiRpc, type PiRpcConnection } from "./PiRpcConnection.ts";
-import { decodeGetStateResponse, type PiRpcResponse } from "./PiRpcContract.ts";
+import {
+  decodeGetCommandsResponse,
+  decodeGetStateResponse,
+  skillsFromCatalog,
+  type PiRpcResponse,
+  type PiRpcSkill,
+} from "./PiRpcContract.ts";
 import type * as PiRpcErrors from "./PiRpcErrors.ts";
 import {
   makePiScopedModelsStatusKey,
@@ -48,6 +55,7 @@ export const PI_SCOPED_MODELS_EXTENSION_PATH = resolvePiExtensionAssetPath(
 export const PI_VERSION_PROBE_TIMEOUT_MS = 4_000;
 export const PI_CATALOG_PROBE_TIMEOUT_MS = 10_000;
 export const PI_SCOPED_MODELS_TIMEOUT_MS = 4_000;
+export const PI_SKILLS_PROBE_TIMEOUT_MS = 4_000;
 const PI_UNRESOLVED_VERSION = "unknown";
 
 const PI_PRESENTATION = {
@@ -392,6 +400,34 @@ export const readPiModelCatalog = Effect.fn("readPiModelCatalog")(function* (inp
   };
 });
 
+function mapPiCommandsToSkills(
+  commands: ReadonlyArray<PiRpcSkill>,
+): ReadonlyArray<ServerProviderSkill> {
+  return commands.map((skill) => ({
+    name: skill.name,
+    path: skill.path,
+    enabled: true,
+    ...(skill.description ? { description: skill.description } : {}),
+    ...(skill.scope?.trim() ? { scope: skill.scope.trim() } : {}),
+  }));
+}
+
+/** Read the skills Pi resolved for one cwd from a short-lived RPC process. */
+export const readPiSkills = Effect.fn("readPiSkills")(function* (input: {
+  readonly connection: PiRpcProbeConnection;
+}): Effect.fn.Return<
+  ReadonlyArray<ServerProviderSkill>,
+  PiRpcErrors.PiRpcError | PiProviderCatalogError
+> {
+  const response = yield* input.connection.request(
+    { type: "get_commands" },
+    `t3-commands-${NodeCrypto.randomUUID()}`,
+  );
+  yield* responseData(response, "get_commands");
+  const catalog = yield* decodeRequired(decodeGetCommandsResponse(response), "get_commands");
+  return mapPiCommandsToSkills(skillsFromCatalog(catalog));
+});
+
 function runPiVersionCommand(settings: PiProviderSettings) {
   const binaryPath = settings.binaryPath.trim() || PI_PROVIDER_BINARY;
   const environment = settings.environment ?? process.env;
@@ -442,10 +478,10 @@ export const resolvePiVersionForSession = Effect.fn("resolvePiVersionForSession"
   return output.code === 0 && version !== null ? version : PI_UNRESOLVED_VERSION;
 });
 
-function connectPiProbe(settings: PiProviderSettings) {
+function connectPiProbe(settings: PiProviderSettings, cwd = settings.cwd ?? process.cwd()) {
   return connectPiRpc({
     binaryPath: settings.binaryPath.trim() || PI_PROVIDER_BINARY,
-    cwd: settings.cwd ?? process.cwd(),
+    cwd,
     args: [
       "--mode",
       "rpc",
@@ -457,6 +493,23 @@ function connectPiProbe(settings: PiProviderSettings) {
     ...(settings.environment !== undefined ? { environment: settings.environment } : {}),
   });
 }
+
+/**
+ * Spawn an isolated Pi process for cwd-sensitive resource discovery. The
+ * caller owns the scope; this helper still closes the connection on every
+ * success, failure, timeout, and interruption path.
+ */
+export const probePiSkillsForCwd = Effect.fn("probePiSkillsForCwd")(function* (input: {
+  readonly settings: PiProviderSettings;
+  readonly cwd: string;
+}): Effect.fn.Return<
+  ReadonlyArray<ServerProviderSkill>,
+  PiRpcErrors.PiRpcError | PiProviderCatalogError,
+  Scope.Scope | ChildProcessSpawner.ChildProcessSpawner
+> {
+  const connection = yield* connectPiProbe(input.settings, input.cwd);
+  return yield* readPiSkills({ connection }).pipe(Effect.ensuring(connection.close));
+});
 
 function providerSnapshot(input: {
   readonly settings: PiProviderSettings;

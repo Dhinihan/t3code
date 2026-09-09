@@ -28,6 +28,12 @@ interface PiSessionDouble {
   readonly terminate: () => Effect.Effect<void>;
 }
 
+interface PiCommandFixture {
+  readonly name: string;
+  readonly source: "extension" | "prompt" | "skill";
+  readonly sourceInfo: { readonly path?: string; readonly [key: string]: unknown };
+}
+
 const makeSessionDouble = Effect.fn("makePiSessionDouble")(function* (
   threadId: ThreadId,
   options: {
@@ -38,6 +44,7 @@ const makeSessionDouble = Effect.fn("makePiSessionDouble")(function* (
     /** How many of those commands succeed before the deadline fires. */
     readonly timeoutAfter?: number;
     readonly stderr?: string;
+    readonly commands?: ReadonlyArray<PiCommandFixture>;
   } = {},
 ): Effect.fn.Return<PiSessionDouble> {
   const eventQueue = yield* Queue.unbounded<PiRpcEvent, Cause.Done<void>>();
@@ -91,7 +98,9 @@ const makeSessionDouble = Effect.fn("makePiSessionDouble")(function* (
                   ...(options.stateModel === undefined ? {} : { model: options.stateModel }),
                 },
               }
-            : {}),
+            : command.type === "get_commands"
+              ? { data: { commands: options.commands ?? [] } }
+              : {}),
         };
       }),
     send: (message) =>
@@ -127,7 +136,11 @@ const makeSessionDouble = Effect.fn("makePiSessionDouble")(function* (
 
 const makeTestAdapter = (
   sessionDouble: PiSessionDouble,
-  options: { readonly attachmentReader?: PiImageAttachmentReader } = {},
+  options: {
+    readonly attachmentReader?: PiImageAttachmentReader;
+    readonly skillFiles?: Readonly<Record<string, string>>;
+    readonly skillReader?: (path: string) => Effect.Effect<string, Error>;
+  } = {},
 ) =>
   makePiAdapter({
     sessionManager: sessionDouble.manager,
@@ -135,6 +148,11 @@ const makeTestAdapter = (
     ...(options.attachmentReader === undefined
       ? {}
       : { attachmentReader: options.attachmentReader }),
+    ...(options.skillReader !== undefined
+      ? { skillReader: options.skillReader }
+      : options.skillFiles === undefined
+        ? {}
+        : { skillReader: (path: string) => Effect.succeed(options.skillFiles?.[path] ?? "") }),
     makeId: (() => {
       let index = 0;
       return () => `pi-test-id-${index++}`;
@@ -161,6 +179,357 @@ const imageReader: PiImageAttachmentReader = {
   attachmentsDir: "/tmp/pi-images",
   readFile: () => Effect.succeed(Uint8Array.from([1, 2, 3])),
 };
+
+const skillCommand = (
+  name: string,
+  path: string,
+  source: "extension" | "prompt" | "skill" = "skill",
+): PiCommandFixture => ({
+  name: source === "skill" ? `skill:${name}` : name,
+  source,
+  sourceInfo: { path, scope: "project", origin: "top-level" },
+});
+
+it.effect("expands ordered, repeated, and inline Pi skill mentions", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("pi-adapter-skill-composition");
+      const alphaPath = "/tmp/project/.pi/skills/alpha/SKILL.md";
+      const betaPath = "/tmp/project/.pi/skills/beta/SKILL.md";
+      const sessionDouble = yield* makeSessionDouble(threadId, {
+        commands: [skillCommand("alpha", alphaPath), skillCommand("beta", betaPath)],
+      });
+      const adapter = yield* makeTestAdapter(sessionDouble, {
+        attachmentReader: imageReader,
+        skillFiles: {
+          [alphaPath]: "---\nname: ignored\n---\n\nAlpha body\n",
+          [betaPath]: "---\ndescription: beta\n---\nBeta body",
+        },
+      });
+
+      yield* adapter.startSession(startInput(threadId));
+      yield* adapter.sendTurn({
+        threadId,
+        input: "before $beta $alpha $beta $HOME after",
+        attachments: [imageAttachment],
+      });
+
+      assert.deepEqual(sessionDouble.requests, [
+        { type: "get_commands" },
+        {
+          type: "get_state",
+        },
+        {
+          type: "prompt",
+          message:
+            'before $beta $alpha $beta $HOME after\n\n<skill name="beta" location="/tmp/project/.pi/skills/beta/SKILL.md">\nReferences are relative to /tmp/project/.pi/skills/beta.\n\nBeta body\n</skill>\n\n<skill name="alpha" location="/tmp/project/.pi/skills/alpha/SKILL.md">\nReferences are relative to /tmp/project/.pi/skills/alpha.\n\nAlpha body\n</skill>',
+          images: [{ type: "image", data: "AQID", mimeType: "image/png" }],
+          streamingBehavior: "steer",
+        },
+      ]);
+    }),
+  ),
+);
+
+it.effect("preserves native commands and validates a leading native skill in mixed input", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("pi-adapter-native-skill-command");
+      const alphaPath = "/tmp/project/.pi/skills/alpha/SKILL.md";
+      const betaPath = "/tmp/project/.pi/skills/beta/SKILL.md";
+      const sessionDouble = yield* makeSessionDouble(threadId, {
+        commands: [
+          { name: "llama", source: "extension", sourceInfo: {} },
+          skillCommand("review", "/tmp/project/.pi/extensions/review.ts", "extension"),
+          skillCommand("template", "/tmp/project/.pi/prompts/template.md", "prompt"),
+          skillCommand("alpha", alphaPath),
+          skillCommand("beta", betaPath),
+        ],
+      });
+      const adapter = yield* makeTestAdapter(sessionDouble, {
+        skillFiles: { [alphaPath]: "Alpha body", [betaPath]: "Beta body" },
+      });
+
+      yield* adapter.startSession(startInput(threadId));
+      yield* adapter.sendTurn({ threadId, input: "/review $beta" });
+      assert.deepEqual(sessionDouble.requests.at(-1), {
+        type: "prompt",
+        message: "/review $beta",
+        streamingBehavior: "steer",
+      });
+
+      const secondThreadId = ThreadId.make("pi-adapter-native-skill-mixed");
+      const secondSessionDouble = yield* makeSessionDouble(secondThreadId, {
+        commands: [skillCommand("alpha", alphaPath), skillCommand("beta", betaPath)],
+      });
+      const secondAdapter = yield* makeTestAdapter(secondSessionDouble, {
+        skillFiles: { [alphaPath]: "Alpha body", [betaPath]: "Beta body" },
+      });
+      yield* secondAdapter.startSession(startInput(secondThreadId));
+      yield* secondAdapter.sendTurn({ threadId: secondThreadId, input: "/skill:alpha text $beta" });
+      assert.deepEqual(secondSessionDouble.requests.at(-1), {
+        type: "prompt",
+        message:
+          '/skill:alpha text $beta\n\n<skill name="beta" location="/tmp/project/.pi/skills/beta/SKILL.md">\nReferences are relative to /tmp/project/.pi/skills/beta.\n\nBeta body\n</skill>',
+        streamingBehavior: "steer",
+      });
+      assert.deepEqual(
+        secondSessionDouble.requests.filter((command) => command.type === "get_commands"),
+        [{ type: "get_commands" }],
+      );
+    }),
+  ),
+);
+
+it.effect("preserves template arguments across space, newline, and tab separators", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("pi-adapter-template-whitespace");
+      const betaPath = "/tmp/project/.pi/skills/beta/SKILL.md";
+      const sessionDouble = yield* makeSessionDouble(threadId, {
+        commands: [
+          skillCommand("template", "/tmp/project/.pi/prompts/template.md", "prompt"),
+          skillCommand("beta", betaPath),
+        ],
+      });
+      const reads: Array<string> = [];
+      const adapter = yield* makeTestAdapter(sessionDouble, {
+        skillReader: (path) => {
+          reads.push(path);
+          return Effect.fail(
+            new PiRpcRequestError({
+              command: "read_skill",
+              detail: `unreadable skill ${path}`,
+            }),
+          );
+        },
+      });
+
+      yield* adapter.startSession(startInput(threadId));
+      for (const input of ["/template $beta", "/template\n$beta", "/template\t$beta"]) {
+        yield* adapter.sendTurn({ threadId, input });
+        assert.deepEqual(sessionDouble.requests.at(-1), {
+          type: "prompt",
+          message: input,
+          streamingBehavior: "steer",
+        });
+      }
+      assert.deepEqual(reads, []);
+    }),
+  ),
+);
+
+it.effect("expands mentions when whitespace prevents a literal native command from matching", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("pi-adapter-literal-command-whitespace");
+      const alphaPath = "/tmp/project/.pi/skills/alpha/SKILL.md";
+      const sessionDouble = yield* makeSessionDouble(threadId, {
+        commands: [
+          { name: "review", source: "extension", sourceInfo: {} },
+          skillCommand("alpha", alphaPath),
+        ],
+      });
+      const adapter = yield* makeTestAdapter(sessionDouble, {
+        skillFiles: { [alphaPath]: "Alpha body" },
+      });
+
+      yield* adapter.startSession(startInput(threadId));
+      for (const input of [
+        "/review\n $alpha",
+        "/review\t $alpha",
+        "/skill:alpha\n $alpha",
+        "/skill:alpha\t $alpha",
+      ]) {
+        yield* adapter.sendTurn({ threadId, input });
+        assert.deepEqual(sessionDouble.requests.at(-1), {
+          type: "prompt",
+          message:
+            `${input}\n\n<skill name="alpha" location="/tmp/project/.pi/skills/alpha/SKILL.md">\n` +
+            "References are relative to /tmp/project/.pi/skills/alpha.\n\nAlpha body\n</skill>",
+          streamingBehavior: "steer",
+        });
+      }
+    }),
+  ),
+);
+
+it.effect("keeps native skill expansion ahead of a colliding template name", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("pi-adapter-skill-template-collision");
+      const alphaPath = "/tmp/project/.pi/skills/alpha/SKILL.md";
+      const betaPath = "/tmp/project/.pi/skills/beta/SKILL.md";
+      const sessionDouble = yield* makeSessionDouble(threadId, {
+        commands: [
+          skillCommand("alpha", alphaPath),
+          {
+            name: "skill:alpha",
+            source: "prompt",
+            sourceInfo: { path: "/tmp/project/.pi/prompts/skill:alpha.md", origin: "top-level" },
+          },
+          skillCommand("beta", betaPath),
+        ],
+      });
+      const adapter = yield* makeTestAdapter(sessionDouble, {
+        skillFiles: { [alphaPath]: "Alpha body", [betaPath]: "Beta body" },
+      });
+
+      yield* adapter.startSession(startInput(threadId));
+      yield* adapter.sendTurn({ threadId, input: "/skill:alpha $beta" });
+      assert.deepEqual(sessionDouble.requests.at(-1), {
+        type: "prompt",
+        message:
+          '/skill:alpha $beta\n\n<skill name="beta" location="/tmp/project/.pi/skills/beta/SKILL.md">\nReferences are relative to /tmp/project/.pi/skills/beta.\n\nBeta body\n</skill>',
+        streamingBehavior: "steer",
+      });
+    }),
+  ),
+);
+
+it.effect("gives colliding extension commands priority with intact arguments", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("pi-adapter-extension-priority");
+      const alphaPath = "/tmp/project/.pi/skills/alpha/SKILL.md";
+      const betaPath = "/tmp/project/.pi/skills/beta/SKILL.md";
+      const sessionDouble = yield* makeSessionDouble(threadId, {
+        commands: [
+          { name: "skill:alpha", source: "extension", sourceInfo: {} },
+          skillCommand("alpha", alphaPath),
+          skillCommand("beta", betaPath),
+        ],
+      });
+      const reads: Array<string> = [];
+      const adapter = yield* makeTestAdapter(sessionDouble, {
+        skillReader: (path) => {
+          reads.push(path);
+          return Effect.succeed("should not be read");
+        },
+      });
+
+      yield* adapter.startSession(startInput(threadId));
+      yield* adapter.sendTurn({ threadId, input: "/skill:alpha $beta" });
+      assert.deepEqual(sessionDouble.requests.at(-1), {
+        type: "prompt",
+        message: "/skill:alpha $beta",
+        streamingBehavior: "steer",
+      });
+      assert.deepEqual(reads, []);
+    }),
+  ),
+);
+
+it.effect("treats a skill-named template as a template when that skill is absent", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("pi-adapter-template-without-skill");
+      const betaPath = "/tmp/project/.pi/skills/beta/SKILL.md";
+      const sessionDouble = yield* makeSessionDouble(threadId, {
+        commands: [
+          {
+            name: "skill:alpha",
+            source: "prompt",
+            sourceInfo: { path: "/tmp/project/.pi/prompts/skill:alpha.md", origin: "top-level" },
+          },
+          skillCommand("beta", betaPath),
+        ],
+      });
+      const adapter = yield* makeTestAdapter(sessionDouble, {
+        skillFiles: { [betaPath]: "Beta body" },
+      });
+
+      yield* adapter.startSession(startInput(threadId));
+      yield* adapter.sendTurn({ threadId, input: "/skill:alpha $beta" });
+      assert.deepEqual(sessionDouble.requests.at(-1), {
+        type: "prompt",
+        message: "/skill:alpha $beta",
+        streamingBehavior: "steer",
+      });
+    }),
+  ),
+);
+
+it.effect("does not duplicate a leading native skill that is also mentioned", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("pi-adapter-native-skill-self-mention");
+      const alphaPath = "/tmp/project/.pi/skills/alpha/SKILL.md";
+      const sessionDouble = yield* makeSessionDouble(threadId, {
+        commands: [skillCommand("alpha", alphaPath)],
+      });
+      const adapter = yield* makeTestAdapter(sessionDouble, {
+        skillFiles: { [alphaPath]: "Alpha body" },
+      });
+
+      yield* adapter.startSession(startInput(threadId));
+      yield* adapter.sendTurn({ threadId, input: "/skill:alpha intro $alpha" });
+      assert.deepEqual(sessionDouble.requests.at(-1), {
+        type: "prompt",
+        message: "/skill:alpha intro $alpha",
+        streamingBehavior: "steer",
+      });
+    }),
+  ),
+);
+
+it.effect("fails get_commands decode before starting a turn", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("pi-adapter-invalid-catalog");
+      const sessionDouble = yield* makeSessionDouble(threadId, {
+        commands: [{ name: "skill:alpha", source: "skill", sourceInfo: {} }],
+      });
+      const adapter = yield* makeTestAdapter(sessionDouble, {
+        skillFiles: {},
+      });
+
+      yield* adapter.startSession(startInput(threadId));
+      const error = yield* Effect.flip(adapter.sendTurn({ threadId, input: "use $alpha" }));
+
+      assert.equal(error._tag, "ProviderAdapterRequestError");
+      if (error._tag === "ProviderAdapterRequestError") {
+        assert.equal(error.method, "get_commands");
+      }
+      assert.deepEqual(sessionDouble.requests, [{ type: "get_commands" }]);
+      assert.equal((yield* adapter.listSessions())[0]?.status, "ready");
+      assert.isUndefined((yield* adapter.listSessions())[0]?.activeTurnId);
+    }),
+  ),
+);
+
+it.effect("fails skill preparation before starting a turn when a skill file is missing", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("pi-adapter-skill-missing");
+      const alphaPath = "/tmp/project/.pi/skills/alpha/SKILL.md";
+      const sessionDouble = yield* makeSessionDouble(threadId, {
+        commands: [skillCommand("alpha", alphaPath)],
+      });
+      const adapter = yield* makeTestAdapter(sessionDouble, {
+        skillReader: () =>
+          Effect.fail(
+            new PiRpcRequestError({
+              command: "read_skill",
+              detail: "ENOENT: no such file or directory, open skill",
+            }),
+          ),
+      });
+
+      yield* adapter.startSession(startInput(threadId));
+      const error = yield* Effect.flip(adapter.sendTurn({ threadId, input: "use $alpha" }));
+
+      assert.equal(error._tag, "ProviderAdapterRequestError");
+      if (error._tag === "ProviderAdapterRequestError") {
+        assert.equal(error.method, "skills/read");
+        assert.include(error.detail, alphaPath);
+      }
+      assert.deepEqual(sessionDouble.requests, [{ type: "get_commands" }]);
+      assert.equal((yield* adapter.listSessions())[0]?.status, "ready");
+      assert.isUndefined((yield* adapter.listSessions())[0]?.activeTurnId);
+    }),
+  ),
+);
 
 it.effect("sends text and ordered images through the Pi prompt command", () =>
   Effect.scoped(

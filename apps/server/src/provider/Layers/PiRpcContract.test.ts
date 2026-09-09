@@ -180,6 +180,152 @@ describe("PiRpcContract", () => {
     if (levels._tag === "Some") assert.deepEqual(levels.value, ["off", "minimal", "xhigh"]);
   });
 
+  it("decodes extension, prompt, and skill commands from get_commands", () => {
+    const catalog = PiRpc.decodeGetCommandsResponse({
+      id: "commands-1",
+      type: "response",
+      command: "get_commands",
+      success: true,
+      data: {
+        commands: [
+          {
+            name: "session-name",
+            description: "An extension command",
+            source: "extension",
+            path: "/legacy/extension.ts",
+          },
+          {
+            name: "template",
+            source: "prompt",
+            extra: true,
+            sourceInfo: { path: "/tmp/template.md", origin: "top-level" },
+          },
+          {
+            name: "skill:browser",
+            description: "Browse the web",
+            source: "skill",
+            path: "/legacy/browser/SKILL.md",
+            location: "user",
+            sourceInfo: {
+              path: "/home/user/.pi/agent/skills/browser/SKILL.md",
+              source: "user",
+              scope: "user",
+              origin: "top-level",
+            },
+            futureField: { retainedByPiButNotConsumed: true },
+          },
+          { not: "a command" },
+          { name: 12, source: "extension" },
+          { name: "future-cmd", source: "brand-new" },
+        ],
+      },
+    });
+
+    assert.equal(catalog._tag, "Some");
+    if (catalog._tag === "None") return;
+    assert.deepEqual(catalog.value, [
+      {
+        name: "session-name",
+        description: "An extension command",
+        source: "extension",
+      },
+      {
+        name: "template",
+        source: "prompt",
+      },
+      {
+        name: "browser",
+        description: "Browse the web",
+        source: "skill",
+        path: "/home/user/.pi/agent/skills/browser/SKILL.md",
+        origin: "top-level",
+        scope: "user",
+      },
+    ]);
+    assert.deepEqual(PiRpc.skillsFromCatalog(catalog.value), [
+      {
+        name: "browser",
+        description: "Browse the web",
+        path: "/home/user/.pi/agent/skills/browser/SKILL.md",
+        origin: "top-level",
+        scope: "user",
+      },
+    ]);
+  });
+
+  it("rejects the catalog when a skill record is invalid", () => {
+    const invalidSkills = [
+      { name: "skill:missing-source-info", source: "skill" },
+      {
+        name: "skill:   ",
+        source: "skill",
+        sourceInfo: { path: "/tmp/blank-name/SKILL.md", origin: "top-level" },
+      },
+      {
+        name: "skill:blank-path",
+        source: "skill",
+        sourceInfo: { path: "   ", origin: "top-level" },
+      },
+      {
+        name: "skill:missing-origin",
+        source: "skill",
+        sourceInfo: { path: "/tmp/missing-origin/SKILL.md" },
+      },
+    ];
+
+    for (const invalid of invalidSkills) {
+      const catalog = PiRpc.decodeGetCommandsResponse({
+        id: "commands-2",
+        type: "response",
+        command: "get_commands",
+        success: true,
+        data: {
+          commands: [
+            invalid,
+            {
+              name: "skill:valid",
+              source: "skill",
+              sourceInfo: {
+                path: "/tmp/valid/SKILL.md",
+                source: "project",
+                scope: "project",
+                origin: "package",
+              },
+            },
+          ],
+        },
+      });
+      assert.equal(catalog._tag, "None", JSON.stringify(invalid));
+    }
+  });
+
+  it("accepts an empty catalog and a catalog with no skills", () => {
+    const empty = PiRpc.decodeGetCommandsResponse({
+      id: "commands-empty",
+      type: "response",
+      command: "get_commands",
+      success: true,
+      data: { commands: [] },
+    });
+    assert.equal(empty._tag, "Some");
+    if (empty._tag === "Some") {
+      assert.deepEqual(empty.value, []);
+      assert.deepEqual(PiRpc.skillsFromCatalog(empty.value), []);
+    }
+
+    const extensionsOnly = PiRpc.decodeGetCommandsResponse({
+      id: "commands-extensions",
+      type: "response",
+      command: "get_commands",
+      success: true,
+      data: { commands: [{ name: "review", source: "extension" }] },
+    });
+    assert.equal(extensionsOnly._tag, "Some");
+    if (extensionsOnly._tag === "Some") {
+      assert.deepEqual(PiRpc.skillsFromCatalog(extensionsOnly.value), []);
+    }
+  });
+
   it("decodes a command error response", () => {
     const record = PiRpc.decodeWireRecord({
       id: "bad-model",

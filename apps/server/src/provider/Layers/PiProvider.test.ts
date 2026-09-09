@@ -19,6 +19,7 @@ import {
   mapPiModelToServerModel,
   mapPiScopedModelsToServerModels,
   readPiModelCatalog,
+  readPiSkills,
   type PiModelDescriptor,
   type PiRpcProbeConnection,
   type PiScopedModelDescriptor,
@@ -45,6 +46,7 @@ const model = (overrides: Partial<PiModelDescriptor> = {}): PiModelDescriptor =>
 const connection = (input: {
   readonly responses: ReadonlyArray<unknown>;
   readonly events: ReadonlyArray<unknown>;
+  readonly getCommands?: unknown;
 }): PiRpcProbeConnection => ({
   pid: 1,
   request: (command) => {
@@ -53,12 +55,14 @@ const connection = (input: {
         ? input.responses[0]
         : command.type === "get_available_models"
           ? input.responses[1]
-          : {
-              type: "response",
-              id: "prompt",
-              command: "prompt",
-              success: true,
-            };
+          : command.type === "get_commands"
+            ? input.getCommands
+            : {
+                type: "response",
+                id: "prompt",
+                command: "prompt",
+                success: true,
+              };
     if (response === undefined) {
       return Effect.die("test connection ran out of responses");
     }
@@ -262,6 +266,71 @@ describe("Pi model catalog probe", () => {
   it("keeps the bridge key protocol namespaced", () => {
     assert.isTrue(makePiScopedModelsStatusKey("id-1").startsWith(PI_SCOPED_MODELS_STATUS_PREFIX));
   });
+});
+
+const getCommandsResponse = (commands: ReadonlyArray<unknown>) => ({
+  type: "response",
+  id: "commands",
+  command: "get_commands",
+  success: true,
+  data: { commands },
+});
+
+describe("Pi skills catalog probe", () => {
+  it.effect("projects skills from a valid catalog and fails an invalid skill record", () =>
+    Effect.gen(function* () {
+      const invalid = yield* readPiSkills({
+        connection: connection({
+          responses: [],
+          events: [],
+          getCommands: getCommandsResponse([{ name: "skill:alpha", source: "skill" }]),
+        }),
+      }).pipe(Effect.exit);
+      assert.equal(invalid._tag, "Failure");
+
+      const skills = yield* readPiSkills({
+        connection: connection({
+          responses: [],
+          events: [],
+          getCommands: getCommandsResponse([
+            { name: "review", source: "extension" },
+            {
+              name: "skill:alpha",
+              description: "Alpha",
+              source: "skill",
+              sourceInfo: {
+                path: "/tmp/project/.pi/skills/alpha/SKILL.md",
+                origin: "top-level",
+                scope: "project",
+              },
+            },
+          ]),
+        }),
+      });
+      assert.deepEqual(skills, [
+        {
+          name: "alpha",
+          path: "/tmp/project/.pi/skills/alpha/SKILL.md",
+          enabled: true,
+          description: "Alpha",
+          scope: "project",
+        },
+      ]);
+    }),
+  );
+
+  it.effect("treats a truly empty catalog as success", () =>
+    Effect.gen(function* () {
+      const skills = yield* readPiSkills({
+        connection: connection({
+          responses: [],
+          events: [],
+          getCommands: getCommandsResponse([]),
+        }),
+      });
+      assert.deepEqual(skills, []);
+    }),
+  );
 });
 
 it.live("runs the disposable snapshot probe through the hermetic Pi peer", () => {

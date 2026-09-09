@@ -10,6 +10,7 @@
  * cycle.
  */
 import * as NodeCrypto from "node:crypto";
+import * as NodePath from "node:path";
 
 import {
   EventId,
@@ -33,6 +34,8 @@ import * as PubSub from "effect/PubSub";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
+import * as Option from "effect/Option";
+import { parse as parseYamlDocument } from "yaml";
 
 import {
   ProviderAdapterProcessError,
@@ -41,7 +44,15 @@ import {
   ProviderAdapterValidationError,
 } from "../Errors.ts";
 import type { ProviderAdapterShape } from "../Services/ProviderAdapter.ts";
-import type { PiRpcCommand, PiRpcEvent, PiRpcExtensionUiResponse } from "./PiRpcContract.ts";
+import {
+  decodeGetCommandsResponse,
+  skillsFromCatalog,
+  type PiRpcCatalogCommand,
+  type PiRpcCommand,
+  type PiRpcEvent,
+  type PiRpcExtensionUiResponse,
+  type PiRpcResponse,
+} from "./PiRpcContract.ts";
 import {
   loadPiImageContents,
   piImageInputSupport,
@@ -61,6 +72,8 @@ export interface PiAdapterOptions {
   readonly instanceId?: ProviderInstanceId;
   /** Server-owned attachment storage and reader; absent only disables image turns. */
   readonly attachmentReader?: PiImageAttachmentReader;
+  /** Server-owned reader for Pi skill files; absent only disables skill expansion. */
+  readonly skillReader?: (path: string) => Effect.Effect<string, Error>;
   /** Injectable id source for hermetic adapter tests. */
   readonly makeId?: () => string;
 }
@@ -133,6 +146,123 @@ function stringValue(value: unknown): string | undefined {
 
 function textValue(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
+}
+
+const PI_SKILL_MENTION_PATTERN =
+  /(^|\s)\$(?![0-9][0-9_]*(?:[kKmMbBtT]|[eE][0-9]+)?(?:\s|$))(?=[a-zA-Z0-9:_-]*[a-zA-Z])([a-zA-Z0-9][a-zA-Z0-9:_-]*)(?=\s|$)/g;
+
+const PI_TEMPLATE_COMMAND_PATTERN = /^\/([^\s]+)(?:\s+([\s\S]*))?$/;
+
+interface PiSkillMention {
+  readonly name: string;
+}
+
+interface PiSkillBlock {
+  readonly name: string;
+  readonly path: string;
+  readonly baseDir: string;
+  readonly body: string;
+}
+
+/**
+ * Match the composer token format. The catalog is deliberately not consulted
+ * here: a live get_commands request is required before a token can expand.
+ */
+function piSkillMentions(prompt: string): Array<PiSkillMention> {
+  return [...prompt.matchAll(PI_SKILL_MENTION_PATTERN)].map((match) => {
+    const name = match[2] ?? "";
+    return { name };
+  });
+}
+
+/**
+ * Pi's native helper parses YAML before returning the body. Keeping that
+ * parse step here means malformed frontmatter fails the same way as native
+ * expansion instead of silently sending a different skill body.
+ */
+export function stripPiSkillFrontmatter(content: string): string {
+  const normalized = content
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/^\uFEFF/, "");
+  if (!normalized.startsWith("---")) return normalized;
+  const endIndex = normalized.indexOf("\n---", 3);
+  if (endIndex === -1) return normalized;
+  const yamlString = normalized.slice(4, endIndex);
+  if (yamlString.length > 0) parseYamlDocument(yamlString);
+  return normalized.slice(endIndex + 4).trim();
+}
+
+function catalogFromResponse(response: PiRpcResponse): ReadonlyArray<PiRpcCatalogCommand> {
+  const decoded = decodeGetCommandsResponse(response);
+  if (Option.isNone(decoded)) {
+    throw new Error("Pi returned an invalid get_commands payload.");
+  }
+  return decoded.value;
+}
+
+function skillBlocksFromCatalog(
+  commands: ReadonlyArray<PiRpcCatalogCommand>,
+): Map<string, PiSkillBlock> {
+  const skills = new Map<string, PiSkillBlock>();
+  for (const command of skillsFromCatalog(commands)) {
+    skills.set(command.name, {
+      name: command.name,
+      path: command.path,
+      baseDir: NodePath.dirname(command.path),
+      body: "",
+    });
+  }
+  return skills;
+}
+
+function leadingLiteralCommandName(prompt: string): string | undefined {
+  if (!prompt.startsWith("/")) return undefined;
+  const spaceIndex = prompt.indexOf(" ");
+  const name = spaceIndex === -1 ? prompt.slice(1) : prompt.slice(1, spaceIndex);
+  return name.length > 0 ? name : undefined;
+}
+
+function nativeSkillName(prompt: string): string | undefined {
+  if (!prompt.startsWith("/skill:")) return undefined;
+  const spaceIndex = prompt.indexOf(" ");
+  const name =
+    spaceIndex === -1 ? prompt.slice("/skill:".length) : prompt.slice("/skill:".length, spaceIndex);
+  return name.length > 0 ? name : undefined;
+}
+
+/**
+ * Match Pi's agent-session dispatch: extension (literal space), then `/skill:`
+ * when that skill exists, then prompt templates (any whitespace).
+ */
+function resolveLeadingNativeCommand(
+  prompt: string,
+  commands: ReadonlyArray<PiRpcCatalogCommand>,
+): PiRpcCatalogCommand | undefined {
+  const literalName = leadingLiteralCommandName(prompt);
+  if (literalName !== undefined) {
+    const extension = commands.find(
+      (command) => command.source === "extension" && command.name === literalName,
+    );
+    if (extension !== undefined) return extension;
+
+    const skillName = nativeSkillName(prompt);
+    if (skillName !== undefined) {
+      const skill = commands.find(
+        (command) => command.source === "skill" && command.name === skillName,
+      );
+      if (skill !== undefined) return skill;
+    }
+  }
+
+  const templateMatch = PI_TEMPLATE_COMMAND_PATTERN.exec(prompt);
+  const templateName = templateMatch?.[1]?.trim();
+  if (templateName === undefined || templateName.length === 0) return undefined;
+  return commands.find((command) => command.source === "prompt" && command.name === templateName);
+}
+
+function formatPiSkillBlock(skill: PiSkillBlock): string {
+  return `<skill name="${skill.name}" location="${skill.path}">\nReferences are relative to ${skill.baseDir}.\n\n${skill.body}\n</skill>`;
 }
 
 function numberValue(value: unknown): number | undefined {
@@ -426,6 +556,96 @@ export const makePiAdapter = Effect.fn("makePiAdapter")(function* (
       });
     }
   };
+
+  const prepareSkillPrompt = Effect.fn("PiAdapter.prepareSkillPrompt")(function* (
+    context: PiSessionContext,
+    prompt: string,
+  ) {
+    const mentions = piSkillMentions(prompt);
+    if (mentions.length === 0) return prompt;
+
+    const response = yield* request(context, { type: "get_commands" });
+    const commands = yield* Effect.try({
+      try: () => catalogFromResponse(response),
+      catch: (cause) =>
+        new ProviderAdapterRequestError({
+          provider: PROVIDER,
+          method: "get_commands",
+          detail: causeMessage(cause),
+          cause,
+        }),
+    });
+
+    const lead = resolveLeadingNativeCommand(prompt, commands);
+    if (lead?.source === "extension" || lead?.source === "prompt") return prompt;
+
+    const skills = skillBlocksFromCatalog(commands);
+    const names = mentions.reduce<Array<string>>((ordered, mention) => {
+      if (skills.has(mention.name) && !ordered.includes(mention.name)) {
+        ordered.push(mention.name);
+      }
+      return ordered;
+    }, []);
+    if (names.length === 0) return prompt;
+
+    // A leading native skill is expanded by Pi itself. In a mixed prompt we
+    // still read it now so a removed or malformed file cannot hide a failure
+    // behind Pi's later, error-event-only native expansion.
+    const nativeName = lead?.source === "skill" ? lead.name : undefined;
+    const readNames =
+      nativeName !== undefined && skills.has(nativeName) && !names.includes(nativeName)
+        ? [nativeName, ...names]
+        : names;
+
+    const reader = options.skillReader;
+    if (reader === undefined) {
+      return yield* new ProviderAdapterRequestError({
+        provider: PROVIDER,
+        method: "skills/read",
+        detail: "Pi skill expansion is unavailable because skill storage is not configured.",
+      });
+    }
+
+    const loaded = new Map<string, PiSkillBlock>();
+    yield* Effect.forEach(readNames, (name) => {
+      const skill = skills.get(name);
+      if (skill === undefined) return Effect.void;
+      return reader(skill.path).pipe(
+        Effect.flatMap((contents) =>
+          Effect.try({
+            try: () => stripPiSkillFrontmatter(contents),
+            catch: (cause) =>
+              new ProviderAdapterRequestError({
+                provider: PROVIDER,
+                method: "skills/read",
+                detail: `Could not parse Pi skill '${name}' at '${skill.path}': ${causeMessage(cause)}`,
+                cause,
+              }),
+          }),
+        ),
+        Effect.map((body) => {
+          loaded.set(name, { ...skill, body });
+        }),
+        Effect.mapError((cause) =>
+          isProviderAdapterRequestError(cause)
+            ? cause
+            : new ProviderAdapterRequestError({
+                provider: PROVIDER,
+                method: "skills/read",
+                detail: `Could not read Pi skill '${name}' at '${skill.path}': ${causeMessage(cause)}`,
+                cause,
+              }),
+        ),
+      );
+    });
+
+    const blocks = names.flatMap((name) => {
+      if (name === nativeName) return [];
+      const skill = loaded.get(name);
+      return skill === undefined ? [] : [formatPiSkillBlock(skill)];
+    });
+    return blocks.length === 0 ? prompt : `${prompt}\n\n${blocks.join("\n\n")}`;
+  });
 
   const emitTurnStarted = (context: PiSessionContext, turnId: TurnId, model?: string) =>
     Effect.gen(function* () {
@@ -1035,6 +1255,7 @@ export const makePiAdapter = Effect.fn("makePiAdapter")(function* (
       });
     }
 
+    const preparedText = yield* prepareSkillPrompt(context, text);
     const parsedModel = parsePiModelSlug(requestedSelection?.model);
     const requestedThinking = getModelSelectionStringOptionValue(requestedSelection, "thinking");
     if (parsedModel !== undefined && requestedSelection?.model !== context.currentModel) {
@@ -1111,7 +1332,7 @@ export const makePiAdapter = Effect.fn("makePiAdapter")(function* (
     // steering path working without our turn state having to agree with Pi's.
     const promptResult = yield* request(context, {
       type: "prompt",
-      message: text,
+      message: preparedText,
       ...(images.length === 0 ? {} : { images }),
       streamingBehavior: "steer",
     }).pipe(Effect.exit);

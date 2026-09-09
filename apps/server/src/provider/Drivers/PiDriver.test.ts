@@ -86,6 +86,10 @@ it.live("materializes an explicit Pi provider instance without a legacy provider
     expect(snapshot.status).toBe("disabled");
     expect(snapshot.models).toEqual([]);
 
+    const workspaceSnapshot = yield* instance!.snapshotForCwd!("/tmp/pi-workspace");
+    expect(workspaceSnapshot.status).toBe("disabled");
+    expect(workspaceSnapshot.skills).toEqual([]);
+
     const driverKinds = BUILT_IN_DRIVERS.map((driver) => driver.driverKind);
     expect(driverKinds).toEqual([
       ProviderDriverKind.make("codex"),

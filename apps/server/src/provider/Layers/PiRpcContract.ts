@@ -40,6 +40,7 @@ export const PiRpcCommand = Schema.Union([
   Schema.Struct({ type: Schema.Literal("get_state") }),
   Schema.Struct({ type: Schema.Literal("get_available_models") }),
   Schema.Struct({ type: Schema.Literal("get_available_thinking_levels") }),
+  Schema.Struct({ type: Schema.Literal("get_commands") }),
   Schema.Struct({
     type: Schema.Literal("set_model"),
     provider: Schema.String,
@@ -133,6 +134,56 @@ const PiRpcAvailableThinkingLevelsData = Schema.Struct({
   levels: Schema.Array(Schema.String),
 });
 
+const PiRpcGetCommandsData = Schema.Struct({
+  commands: Schema.Array(Schema.Unknown),
+});
+
+export const PiRpcSkillOrigin = Schema.Literals(["package", "top-level"]);
+export type PiRpcSkillOrigin = typeof PiRpcSkillOrigin.Type;
+
+const PiRpcCatalogCommandDescription = Schema.optional(Schema.String);
+
+/** Extension or prompt-template command used for native leading-command dispatch. */
+export const PiRpcCatalogSlashRecord = Schema.Struct({
+  name: Schema.String.check(Schema.isNonEmpty()),
+  description: PiRpcCatalogCommandDescription,
+  source: Schema.Literals(["extension", "prompt"]),
+});
+export type PiRpcCatalogSlashRecord = typeof PiRpcCatalogSlashRecord.Type;
+
+/** Skill record as Pi reports it on the wire, before name/path normalization. */
+export const PiRpcCatalogSkillRecord = Schema.Struct({
+  name: Schema.String.check(Schema.isNonEmpty()),
+  description: PiRpcCatalogCommandDescription,
+  source: Schema.Literal("skill"),
+  sourceInfo: Schema.Struct({
+    path: Schema.String.check(Schema.isNonEmpty()),
+    origin: PiRpcSkillOrigin,
+    scope: Schema.optional(Schema.String),
+  }),
+});
+export type PiRpcCatalogSkillRecord = typeof PiRpcCatalogSkillRecord.Type;
+
+export interface PiRpcCatalogSlashCommand {
+  readonly name: string;
+  readonly source: "extension" | "prompt";
+  readonly description?: string;
+}
+
+export interface PiRpcCatalogSkillCommand {
+  readonly name: string;
+  readonly source: "skill";
+  readonly description?: string;
+  readonly path: string;
+  readonly origin: PiRpcSkillOrigin;
+  readonly scope?: string;
+}
+
+export type PiRpcCatalogCommand = PiRpcCatalogSlashCommand | PiRpcCatalogSkillCommand;
+
+/** Skill metadata projected from a decoded `get_commands` catalog. */
+export type PiRpcSkill = Omit<PiRpcCatalogSkillCommand, "source">;
+
 /** Decode the thinking-level catalog consumed by the manual compatibility probe. */
 export function decodeAvailableThinkingLevelsResponse(
   input: unknown,
@@ -147,6 +198,60 @@ export function decodeAvailableThinkingLevelsResponse(
   }
   const data = decodeAvailableThinkingLevelsData(response.value.data);
   return data._tag === "Some" ? Option.some(data.value.levels) : Option.none();
+}
+
+/**
+ * Decode Pi's full `get_commands` catalog.
+ *
+ * `source: "skill"` records are strict: missing path, blank name after the
+ * optional `skill:` prefix, or missing origin fail the whole decode. Extension
+ * and prompt commands that do not match their schema are ignored. Unknown
+ * sources and extra fields are tolerated. An empty catalog is success.
+ */
+export function decodeGetCommandsResponse(
+  input: unknown,
+): Option.Option<ReadonlyArray<PiRpcCatalogCommand>> {
+  const response = decodeResponse(input);
+  if (response._tag === "None") return Option.none();
+  if (response.value.command !== "get_commands" || response.value.success !== true) {
+    return Option.none();
+  }
+
+  const data = decodeGetCommandsData(response.value.data);
+  if (data._tag === "None") return Option.none();
+
+  const commands: Array<PiRpcCatalogCommand> = [];
+  for (const command of data.value.commands) {
+    if (isSkillSource(command)) {
+      const skill = decodeCatalogSkillCommand(command);
+      if (skill._tag === "None") return Option.none();
+      commands.push(skill.value);
+      continue;
+    }
+    const slash = decodeCatalogSlashCommand(command);
+    if (slash._tag === "Some") commands.push(slash.value);
+  }
+  return Option.some(commands);
+}
+
+/** Project inventory skills from a decoded catalog, preserving first-seen order. */
+export function skillsFromCatalog(
+  commands: ReadonlyArray<PiRpcCatalogCommand>,
+): ReadonlyArray<PiRpcSkill> {
+  const skills: Array<PiRpcSkill> = [];
+  const seen = new Set<string>();
+  for (const command of commands) {
+    if (command.source !== "skill" || seen.has(command.name)) continue;
+    seen.add(command.name);
+    skills.push({
+      name: command.name,
+      ...(command.description ? { description: command.description } : {}),
+      path: command.path,
+      origin: command.origin,
+      ...(command.scope ? { scope: command.scope } : {}),
+    });
+  }
+  return skills;
 }
 
 // ---------------------------------------------------------------------------
@@ -191,6 +296,48 @@ const decodeGetStateData = Schema.decodeUnknownOption(PiRpcGetStateData);
 const decodeAvailableThinkingLevelsData = Schema.decodeUnknownOption(
   PiRpcAvailableThinkingLevelsData,
 );
+const decodeGetCommandsData = Schema.decodeUnknownOption(PiRpcGetCommandsData);
+const decodeCatalogSlashRecord = Schema.decodeUnknownOption(PiRpcCatalogSlashRecord);
+const decodeCatalogSkillRecord = Schema.decodeUnknownOption(PiRpcCatalogSkillRecord);
+
+function isSkillSource(command: unknown): boolean {
+  return isObject(command) && command.source === "skill";
+}
+
+function decodeCatalogSlashCommand(command: unknown): Option.Option<PiRpcCatalogSlashCommand> {
+  const entry = decodeCatalogSlashRecord(command);
+  if (entry._tag === "None") return Option.none();
+  const name = entry.value.name.trim();
+  if (name.length === 0) return Option.none();
+  const description = entry.value.description?.trim();
+  return Option.some({
+    name,
+    source: entry.value.source,
+    ...(description ? { description } : {}),
+  });
+}
+
+function decodeCatalogSkillCommand(command: unknown): Option.Option<PiRpcCatalogSkillCommand> {
+  const entry = decodeCatalogSkillRecord(command);
+  if (entry._tag === "None") return Option.none();
+  const name = (
+    entry.value.name.startsWith("skill:")
+      ? entry.value.name.slice("skill:".length)
+      : entry.value.name
+  ).trim();
+  const path = entry.value.sourceInfo.path.trim();
+  if (name.length === 0 || path.length === 0) return Option.none();
+  const description = entry.value.description?.trim();
+  const scope = entry.value.sourceInfo.scope?.trim();
+  return Option.some({
+    name,
+    source: "skill",
+    ...(description ? { description } : {}),
+    path,
+    origin: entry.value.sourceInfo.origin,
+    ...(scope ? { scope } : {}),
+  });
+}
 
 /** Categorizes a decoded record into the shapes the runtime routes on. */
 export function classifyRecord(record: PiRpcResponse | PiRpcEvent): "response" | "event" {

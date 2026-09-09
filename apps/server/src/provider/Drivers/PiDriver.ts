@@ -28,6 +28,8 @@ import {
   checkPiProviderStatus,
   PI_PROVIDER_BINARY,
   PI_SCOPED_MODELS_EXTENSION_PATH,
+  PI_SKILLS_PROBE_TIMEOUT_MS,
+  probePiSkillsForCwd,
   resolvePiVersionForSession,
   type PiProviderSettings,
 } from "../Layers/PiProvider.ts";
@@ -191,6 +193,7 @@ export const PiDriver: ProviderDriver<PiDriverConfig, PiDriverEnv> = {
               ),
             ),
         } satisfies PiImageAttachmentReader,
+        skillReader: (path) => fileSystem.readFileString(path),
       });
       const textGeneration = yield* makePiTextGeneration();
       const snapshotSettings = makeProviderSnapshotSettingsSource(providerSettings, serverSettings);
@@ -218,6 +221,26 @@ export const PiDriver: ProviderDriver<PiDriverConfig, PiDriverEnv> = {
           }),
         ),
       );
+      const snapshotForCwd = (cwd: string) =>
+        !enabled
+          ? snapshot.getSnapshot
+          : Effect.all([
+              snapshot.getSnapshot,
+              probePiSkillsForCwd({ settings: providerSettings, cwd }).pipe(
+                Effect.scoped,
+                Effect.timeout(PI_SKILLS_PROBE_TIMEOUT_MS),
+                Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, childProcessSpawner),
+              ),
+            ]).pipe(
+              Effect.map(([machineSnapshot, skills]) => ({ ...machineSnapshot, skills })),
+              Effect.mapError((cause) =>
+                toProviderDriverError({
+                  instanceId,
+                  operation: `discover Pi skills for '${cwd}'`,
+                  cause,
+                }),
+              ),
+            );
 
       return {
         instanceId,
@@ -227,6 +250,7 @@ export const PiDriver: ProviderDriver<PiDriverConfig, PiDriverEnv> = {
         accentColor,
         enabled,
         snapshot,
+        snapshotForCwd,
         adapter,
         textGeneration,
       } satisfies ProviderInstance;
