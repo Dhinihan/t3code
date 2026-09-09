@@ -164,7 +164,7 @@ describe("Pi model snapshot mapping", () => {
     assert.isFalse(isPiModelSelectionStale(catalog, undefined));
   });
 
-  it("publishes a checking snapshot without inventing a Pi model", () =>
+  it.effect("publishes a checking snapshot without inventing a Pi model", () =>
     Effect.gen(function* () {
       const snapshot = yield* buildInitialPiProviderSnapshot({
         enabled: true,
@@ -175,7 +175,8 @@ describe("Pi model snapshot mapping", () => {
       assert.equal(snapshot.models.length, 0);
       assert.equal(snapshot.version, null);
       assert.include(snapshot.message ?? "", "Checking Pi");
-    }));
+    }),
+  );
 });
 
 describe("Pi model catalog probe", () => {

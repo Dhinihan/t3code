@@ -21,7 +21,7 @@ export interface PiImageAttachmentReader {
   readonly readFile: (path: string) => Effect.Effect<Uint8Array, PiImageAttachmentReadError>;
 }
 
-export class PiImageAttachmentError extends Schema.TaggedErrorClass<PiImageAttachmentError>()(
+export class PiImageAttachmentError extends Schema.TaggedError<PiImageAttachmentError>()(
   "PiImageAttachmentError",
   {
     detail: Schema.String,
@@ -38,7 +38,7 @@ export class PiImageAttachmentError extends Schema.TaggedErrorClass<PiImageAttac
   }
 }
 
-export class PiImageAttachmentReadError extends Schema.TaggedErrorClass<PiImageAttachmentReadError>()(
+export class PiImageAttachmentReadError extends Schema.TaggedError<PiImageAttachmentReadError>()(
   "PiImageAttachmentReadError",
   {
     path: Schema.String,

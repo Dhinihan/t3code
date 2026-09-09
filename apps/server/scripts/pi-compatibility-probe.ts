@@ -49,7 +49,7 @@ import {
 } from "../src/provider/Layers/PiProvider.ts";
 import { resolveSpawnCommand } from "@t3tools/shared/shell";
 
-export class PiProbeValidationError extends Schema.TaggedErrorClass<PiProbeValidationError>()(
+export class PiProbeValidationError extends Schema.TaggedError<PiProbeValidationError>()(
   "PiProbeValidationError",
   {
     operation: Schema.String,

@@ -1,5 +1,5 @@
 /**
- * Pi RPC error taxonomy — typed `Schema.TaggedErrorClass` errors in the same
+ * Pi RPC error taxonomy — typed `Schema.TaggedError` errors in the same
  * style as `packages/effect-codex-app-server/src/errors.ts`. The public
  * `message` of `PiRpcCompatibilityError` is the stable sentence pinned by the
  * suite (ticket 13); the structured fields are asserted separately.
@@ -8,7 +8,7 @@ import * as Schema from "effect/Schema";
 
 import type { PiRpcResponse } from "./PiRpcContract.ts";
 
-export class PiRpcCompatibilityError extends Schema.TaggedErrorClass<PiRpcCompatibilityError>()(
+export class PiRpcCompatibilityError extends Schema.TaggedError<PiRpcCompatibilityError>()(
   "PiRpcCompatibilityError",
   {
     operation: Schema.String,
@@ -26,7 +26,7 @@ export class PiRpcCompatibilityError extends Schema.TaggedErrorClass<PiRpcCompat
   }
 }
 
-export class PiRpcSpawnError extends Schema.TaggedErrorClass<PiRpcSpawnError>()("PiRpcSpawnError", {
+export class PiRpcSpawnError extends Schema.TaggedError<PiRpcSpawnError>()("PiRpcSpawnError", {
   command: Schema.optionalKey(Schema.String),
   cause: Schema.Defect(),
 }) {
@@ -37,7 +37,7 @@ export class PiRpcSpawnError extends Schema.TaggedErrorClass<PiRpcSpawnError>()(
   }
 }
 
-export class PiRpcProcessExitedError extends Schema.TaggedErrorClass<PiRpcProcessExitedError>()(
+export class PiRpcProcessExitedError extends Schema.TaggedError<PiRpcProcessExitedError>()(
   "PiRpcProcessExitedError",
   {
     code: Schema.optionalKey(Schema.Number),
@@ -52,7 +52,7 @@ export class PiRpcProcessExitedError extends Schema.TaggedErrorClass<PiRpcProces
   }
 }
 
-export class PiRpcTransportError extends Schema.TaggedErrorClass<PiRpcTransportError>()(
+export class PiRpcTransportError extends Schema.TaggedError<PiRpcTransportError>()(
   "PiRpcTransportError",
   {
     operation: Schema.optionalKey(Schema.String),
@@ -64,7 +64,7 @@ export class PiRpcTransportError extends Schema.TaggedErrorClass<PiRpcTransportE
   }
 }
 
-export class PiRpcTerminatedError extends Schema.TaggedErrorClass<PiRpcTerminatedError>()(
+export class PiRpcTerminatedError extends Schema.TaggedError<PiRpcTerminatedError>()(
   "PiRpcTerminatedError",
   {},
 ) {
@@ -73,7 +73,7 @@ export class PiRpcTerminatedError extends Schema.TaggedErrorClass<PiRpcTerminate
   }
 }
 
-export class PiRpcRequestTimeoutError extends Schema.TaggedErrorClass<PiRpcRequestTimeoutError>()(
+export class PiRpcRequestTimeoutError extends Schema.TaggedError<PiRpcRequestTimeoutError>()(
   "PiRpcRequestTimeoutError",
   {
     command: Schema.String,
@@ -85,7 +85,7 @@ export class PiRpcRequestTimeoutError extends Schema.TaggedErrorClass<PiRpcReque
   }
 }
 
-export class PiRpcRequestError extends Schema.TaggedErrorClass<PiRpcRequestError>()(
+export class PiRpcRequestError extends Schema.TaggedError<PiRpcRequestError>()(
   "PiRpcRequestError",
   {
     command: Schema.String,

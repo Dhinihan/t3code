@@ -1,6 +1,6 @@
 import * as Schema from "effect/Schema";
 
-export class PiSessionLifecycleError extends Schema.TaggedErrorClass<PiSessionLifecycleError>()(
+export class PiSessionLifecycleError extends Schema.TaggedError<PiSessionLifecycleError>()(
   "PiSessionLifecycleError",
   {
     operation: Schema.String,
