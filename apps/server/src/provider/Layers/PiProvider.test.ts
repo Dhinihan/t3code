@@ -330,3 +330,22 @@ it.live("runs the disposable snapshot probe through the hermetic Pi peer", () =>
     ),
   );
 });
+
+for (const stderr of ["  version command failed  ", ""]) {
+  it.live(`reports failed version probes with ${stderr ? "stderr" : "stdout"}`, () =>
+    Effect.gen(function* () {
+      const snapshot = yield* checkPiProviderStatus(
+        { enabled: true, binaryPath: "pi" },
+        {
+          runVersion: () => Effect.succeed({ stdout: "pi 0.84.1", stderr, code: 1 }),
+          connect: () => Effect.die("A failed version probe must not start an RPC session"),
+        },
+      );
+      assert.equal(snapshot.status, "error");
+      assert.equal(
+        snapshot.message,
+        `Pi CLI version probe failed: ${stderr.trim() || "pi 0.84.1"}`,
+      );
+    }).pipe(Effect.provide(NodeServices.layer)),
+  );
+}

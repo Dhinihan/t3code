@@ -25,7 +25,6 @@ import { resolveSpawnCommand } from "@t3tools/shared/shell";
 
 import {
   buildServerProvider,
-  detailFromResult,
   isCommandMissingCause,
   parseGenericCliVersion,
   spawnAndCollect,
@@ -553,7 +552,10 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
   const versionOutput = versionResult.success.value;
   const version = parseGenericCliVersion(`${versionOutput.stdout}\n${versionOutput.stderr}`);
   if (versionOutput.code !== 0 || version === null) {
-    const detail = detailFromResult(versionOutput);
+    const detail =
+      versionOutput.stderr.trim() ||
+      versionOutput.stdout.trim() ||
+      `Command exited with code ${versionOutput.code}.`;
     return providerSnapshot({
       settings,
       checkedAt,
