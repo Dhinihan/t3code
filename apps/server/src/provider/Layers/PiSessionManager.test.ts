@@ -132,6 +132,8 @@ it.effect("handshakes once and reuses the active process for a thread", () =>
       });
       assert.deepEqual(fake.calls[0]?.args, [
         "--approve",
+        "--extension",
+        NodePath.join(import.meta.dirname, "../pi/PiSubagentsExtension.ts"),
         "--mode",
         "rpc",
         "--session-dir",

@@ -1,6 +1,7 @@
 export const PI_EXTENSION_ASSET_NAMES = [
   "PiScopedModelsExtension.ts",
   "PiT3McpExtension.ts",
+  "PiSubagentsExtension.ts",
 ] as const;
 
 export type PiExtensionAssetName = (typeof PI_EXTENSION_ASSET_NAMES)[number];

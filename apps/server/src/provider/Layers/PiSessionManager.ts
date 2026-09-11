@@ -23,6 +23,7 @@ import * as Scope from "effect/Scope";
 import * as Semaphore from "effect/Semaphore";
 
 import * as McpProviderSession from "../../mcp/McpProviderSession.ts";
+import { resolvePiExtensionAssetPath } from "../pi/PiExtensionAssets.ts";
 import * as PiCompatibility from "./PiCompatibility.ts";
 import { makePiMcpSessionLease, type PiMcpSessionLease } from "./PiMcpSession.ts";
 import { connectPiRpc, type PiRpcConnection } from "./PiRpcConnection.ts";
@@ -426,6 +427,8 @@ const makePiSessionManager = Effect.fn("makePiSessionManager")(function* (
         : undefined;
       const args = [
         ...(options.args ?? ["--approve"]),
+        "--extension",
+        resolvePiExtensionAssetPath("PiSubagentsExtension.ts"),
         ...(mcpLease === undefined ? [] : ["--extension", mcpLease.extensionPath]),
         "--mode",
         "rpc",

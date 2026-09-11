@@ -102,9 +102,15 @@ subagentes, incluindo:
 - paralelismo e limite de concorrência definidos pela própria extensão;
 - todos os harnesses que a extensão atual já suporta.
 
-O T3 apenas transporta as chamadas e resultados genéricos. Não cria threads T3
-filhas, seletor de harness, FleetView, takeover ou gerenciamento individual de
-subagentes no mobile.
+O T3 transporta as chamadas e resultados e aproveita os snapshots da extensão
+local para alimentar o acompanhamento de subagentes já existente no web,
+desktop e mobile. Sem o protocolo de snapshots compatível, mantém o transporte
+genérico. Não cria threads T3 filhas, seletor de harness, FleetView, takeover ou
+gerenciamento individual de subagentes no mobile.
+
+Quando há subagentes ativos observados, o Stop encerra a sessão Pi e seus
+processos filhos, inclusive depois do término do turno principal. O próximo
+envio retoma a conversa persistida.
 
 Subagentes não recebem MCP do T3 no MVP. O MCP fica disponível somente ao Pi
 principal. Isso evita acoplamento de credenciais, identidade de thread e estado

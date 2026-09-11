@@ -1331,3 +1331,111 @@ it.effect("reports a dead Pi process and removes only the active session", () =>
     }),
   ),
 );
+
+const subagentSnapshot = (sequence: number, status: "running" | "done" = "running") => ({
+  type: "extension_ui_request",
+  id: `subagents-${sequence}`,
+  method: "setStatus",
+  statusKey: "t3-subagents:v1",
+  statusText: JSON.stringify({
+    protocolVersion: 1,
+    sequence,
+    sessions: [
+      {
+        id: "sa-1",
+        origin: "model",
+        title: "Review",
+        backend: "pi",
+        model: "test/model",
+        status,
+        terminalReason: status === "done" ? "completed" : null,
+        createdAt: 1000,
+        updatedAt: 2000 + sequence,
+        settledAt: status === "done" ? 2000 : null,
+        context: { occupancyTokens: 10, capacityTokens: 1000 },
+        cumulative: { tokens: 20, costUsd: null },
+        generation: { active: status === "running", counter: 1, outputCharacters: 10 },
+        tools: { active: 0, done: 1, error: 0, activities: [] },
+      },
+    ],
+  }),
+});
+
+it.effect("stops live Pi subagents after the parent turn has settled", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("pi-background-stop");
+      const sessionDouble = yield* makeSessionDouble(threadId);
+      const adapter = yield* makeTestAdapter(sessionDouble);
+      const eventsFiber = yield* adapter.streamEvents.pipe(
+        Stream.takeUntil((event) => event.type === "session.exited"),
+        Stream.runCollect,
+        Effect.forkScoped,
+      );
+      const settled = yield* adapter.streamEvents.pipe(
+        Stream.filter((event) => event.type === "turn.completed"),
+        Stream.take(1),
+        Stream.runCollect,
+        Effect.forkScoped,
+      );
+      yield* adapter.startSession(startInput(threadId));
+      const turn = yield* adapter.sendTurn({ threadId, input: "delegate" });
+      yield* sessionDouble.push(subagentSnapshot(1));
+      yield* sessionDouble.push({ type: "agent_settled" });
+      yield* Fiber.join(settled);
+      yield* adapter.interruptTurn(threadId);
+      const events = yield* Fiber.join(eventsFiber);
+      assert.equal(yield* adapter.hasSession(threadId), false);
+      assert.equal(yield* sessionDouble.manager.has(threadId), false);
+      assert.equal(
+        sessionDouble.requests.some((command) => command.type === "abort"),
+        false,
+      );
+      const start = events.find((event) => event.type === "task.started");
+      assert.equal(start?.turnId, turn.turnId);
+      const terminals = events.filter(
+        (event) => event.type === "task.completed" || event.type === "task.updated",
+      );
+      assert.isTrue(
+        terminals.some(
+          (event) => event.type === "task.updated" && event.payload.status === "interrupted",
+        ),
+      );
+      assert.equal(events.at(-1)?.type, "session.exited");
+    }),
+  ),
+);
+
+it.effect("keeps child completion on its original turn and does not close an idle Pi session", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("pi-background-complete");
+      const sessionDouble = yield* makeSessionDouble(threadId);
+      const adapter = yield* makeTestAdapter(sessionDouble);
+      const eventsFiber = yield* adapter.streamEvents.pipe(
+        Stream.takeUntil((event) => event.type === "task.completed"),
+        Stream.runCollect,
+        Effect.forkScoped,
+      );
+      const settled = yield* adapter.streamEvents.pipe(
+        Stream.filter((event) => event.type === "turn.completed"),
+        Stream.take(1),
+        Stream.runCollect,
+        Effect.forkScoped,
+      );
+      yield* adapter.startSession(startInput(threadId));
+      const first = yield* adapter.sendTurn({ threadId, input: "delegate" });
+      yield* sessionDouble.push(subagentSnapshot(1));
+      yield* sessionDouble.push({ type: "agent_settled" });
+      yield* Fiber.join(settled);
+      yield* adapter.sendTurn({ threadId, input: "another task" });
+      yield* sessionDouble.push(subagentSnapshot(2, "done"));
+      const events = yield* Fiber.join(eventsFiber);
+      const completed = events.find((event) => event.type === "task.completed");
+      assert.equal(completed?.turnId, first.turnId);
+      yield* adapter.interruptTurn(threadId);
+      assert.equal(sessionDouble.requests.at(-1)?.type, "abort");
+      assert.equal(yield* adapter.hasSession(threadId), true);
+    }),
+  ),
+);

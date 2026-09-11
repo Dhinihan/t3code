@@ -58,6 +58,7 @@ import {
   piImageInputSupport,
   type PiImageAttachmentReader,
 } from "./PiImageAttachments.ts";
+import { makePiSubagentEvents } from "./PiSubagentEvents.ts";
 import { PiRpcRequestTimeoutError } from "./PiRpcErrors.ts";
 import type { PiSession, PiSessionManager, PiSessionManagerError } from "./PiSessionManager.ts";
 
@@ -109,6 +110,7 @@ interface ToolItemState {
 interface PiSessionContext {
   readonly threadId: ThreadId;
   readonly piSession: PiSession;
+  readonly subagents: ReturnType<typeof makePiSubagentEvents>;
   session: ProviderSession;
   turns: Array<{ id: TurnId; items: Array<unknown> }>;
   activeTurnId: TurnId | undefined;
@@ -1023,10 +1025,28 @@ export const makePiAdapter = Effect.fn("makePiAdapter")(function* (
     });
   });
 
+  const emitSubagentUpdates = Effect.fn("PiAdapter.emitSubagentUpdates")(function* (
+    context: PiSessionContext,
+    updates: ReturnType<ReturnType<typeof makePiSubagentEvents>["accept"]>,
+  ) {
+    for (const update of updates) {
+      yield* emit({
+        ...(yield* makeEventBase({ threadId: context.threadId, turnId: update.turnId })),
+        ...update,
+      });
+    }
+  });
+
   const handleEvent = Effect.fn("PiAdapter.handleEvent")(function* (
     context: PiSessionContext,
     event: PiRpcEvent,
   ) {
+    if (event.type === "extension_ui_request" || event.type === "tool_execution_end") {
+      yield* emitSubagentUpdates(
+        context,
+        context.subagents.accept({ event, turnId: currentTurn(context) }),
+      );
+    }
     switch (event.type) {
       case "message_start": {
         const message = isRecord(event.message) ? event.message : undefined;
@@ -1125,6 +1145,7 @@ export const makePiAdapter = Effect.fn("makePiAdapter")(function* (
     if (context.stopped) return;
     context.stopped = true;
     sessions.delete(context.threadId);
+    yield* emitSubagentUpdates(context, context.subagents.close());
     const activeTurnId = context.activeTurnId;
     if (activeTurnId !== undefined) {
       yield* emit({
@@ -1205,6 +1226,7 @@ export const makePiAdapter = Effect.fn("makePiAdapter")(function* (
       const context: PiSessionContext = {
         threadId: input.threadId,
         piSession,
+        subagents: makePiSubagentEvents({ runtimeId: NodeCrypto.randomUUID() }),
         session: {
           provider: PROVIDER,
           providerInstanceId: boundInstanceId,
@@ -1367,8 +1389,14 @@ export const makePiAdapter = Effect.fn("makePiAdapter")(function* (
     function* (threadId, requestedTurnId) {
       const context = yield* requireSession(threadId);
       const activeTurnId = context.activeTurnId;
-      if (activeTurnId === undefined) return;
       if (requestedTurnId !== undefined && requestedTurnId !== activeTurnId) return;
+      // Pi's parent abort leaves detached subagents alive. Stop the owned
+      // process when there is child work, including after the parent settled.
+      if (context.subagents.hasLiveTasks()) {
+        yield* stopSession(threadId);
+        return;
+      }
+      if (activeTurnId === undefined) return;
       context.abortRequestedTurnId = activeTurnId;
       yield* request(context, { type: "abort" }).pipe(Effect.asVoid);
     },
@@ -1405,6 +1433,14 @@ export const makePiAdapter = Effect.fn("makePiAdapter")(function* (
       sessions.delete(threadId);
       if (context.eventFiber !== undefined) yield* Fiber.interrupt(context.eventFiber);
       yield* options.sessionManager.stop(threadId);
+      yield* emitSubagentUpdates(context, context.subagents.close());
+      if (context.activeTurnId !== undefined) {
+        yield* emit({
+          ...(yield* makeEventBase({ threadId, turnId: context.activeTurnId })),
+          type: "turn.completed",
+          payload: { state: "interrupted" },
+        });
+      }
       yield* emit({
         ...(yield* makeEventBase({ threadId })),
         type: "session.exited",
