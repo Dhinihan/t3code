@@ -20,6 +20,7 @@ const makeConfig = (providerSessionId: string) => ({
   providerInstanceId: ProviderInstanceId.make("pi"),
   endpoint: "http://127.0.0.1:43123/mcp",
   authorizationHeader: "Bearer disposable-pi-mcp-secret",
+  capabilities: new Set<string>(),
 });
 
 it.effect("leases an ephemeral wrapper and cleans the exact provider credential", () =>

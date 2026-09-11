@@ -157,6 +157,7 @@ it.effect("gives only the main Pi process an ephemeral T3 MCP extension", () =>
         providerInstanceId: ProviderInstanceId.make("pi"),
         endpoint: "http://127.0.0.1:43123/mcp",
         authorizationHeader: "Bearer main-pi-only-secret",
+        capabilities: new Set<string>(),
       };
       const revoked: string[] = [];
       McpProviderSession.setMcpProviderSession(config);
@@ -229,6 +230,7 @@ it.effect("revokes and removes the Pi MCP lease after an unexpected process exit
         providerInstanceId: ProviderInstanceId.make("pi"),
         endpoint: "http://127.0.0.1:43123/mcp",
         authorizationHeader: "Bearer crash-only-secret",
+        capabilities: new Set<string>(),
       };
       const revoked: string[] = [];
       const cleanupStarted = yield* Deferred.make<void, never>();
