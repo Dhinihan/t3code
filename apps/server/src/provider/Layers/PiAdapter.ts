@@ -64,9 +64,6 @@ import type { PiSession, PiSessionManager, PiSessionManagerError } from "./PiSes
 
 const PROVIDER = ProviderDriverKind.make("pi");
 const BLOCKING_EXTENSION_UI_METHODS = new Set(["select", "confirm", "input", "editor"]);
-const PI_SUBAGENT_ABORTED_RESULT = "Subagent spawn aborted.";
-const PI_CURSOR_SUBAGENT_UNAVAILABLE_ERROR =
-  "Pi subagents are unavailable with Cursor-backed models because nested Pi sessions share Cursor runtime state and abort the parent turn. Choose an openai-codex-backed Pi model or another harness.";
 
 export interface PiAdapterOptions {
   readonly sessionManager: PiSessionManager;
@@ -310,26 +307,6 @@ function jsonSignature(value: unknown): string | undefined {
   } catch {
     return undefined;
   }
-}
-
-function toolResultText(value: unknown): string | undefined {
-  if (isRecord(value)) {
-    const text = textParts(value.content);
-    if (text.length > 0) return text.join("\n");
-  }
-  return detailFromUnknown(value);
-}
-
-function isCursorPiSubagentStartupAbort(context: PiSessionContext, item: ToolItemState): boolean {
-  return (
-    context.abortRequestedTurnId === undefined &&
-    item.isError &&
-    item.toolName.toLowerCase() === "subagent_spawn" &&
-    isRecord(item.args) &&
-    item.args.harness === "pi" &&
-    (context.currentModel ?? context.session.model)?.startsWith("cursor/") === true &&
-    toolResultText(item.result)?.trim() === PI_SUBAGENT_ABORTED_RESULT
-  );
 }
 
 function causeMessage(cause: unknown): string {
@@ -779,12 +756,7 @@ export const makePiAdapter = Effect.fn("makePiAdapter")(function* (
       stringValue(message.errorMessage) ??
       stringValue(message.error) ??
       (stopReason === "error" ? "Pi reported an assistant message error." : undefined);
-    if (
-      errorMessage !== undefined &&
-      context.turnFailureMessage !== PI_CURSOR_SUBAGENT_UNAVAILABLE_ERROR
-    ) {
-      context.turnFailureMessage = errorMessage;
-    }
+    if (errorMessage !== undefined) context.turnFailureMessage = errorMessage;
     for (const part of readAssistantContent(message.content)) {
       yield* completeAssistantItem(
         context,
@@ -834,21 +806,9 @@ export const makePiAdapter = Effect.fn("makePiAdapter")(function* (
       if (signature !== undefined && signature === item.lastUpdateSignature) return;
       item.lastUpdateSignature = signature;
     }
-    const cursorPiSubagentStartupAbort =
-      phase === "end" && isCursorPiSubagentStartupAbort(context, item);
-    if (cursorPiSubagentStartupAbort) {
-      // The Pi subagent extension returns this text when its tool signal is
-      // interrupted. With Cursor-backed parents, binding the in-process child
-      // reloads Cursor's process-global session scope and interrupts that
-      // parent. Preserve a stable capability error for T3 instead of exposing
-      // the generic SDK abort to the user.
-      context.turnFailureMessage = PI_CURSOR_SUBAGENT_UNAVAILABLE_ERROR;
-    }
     const type =
       phase === "start" ? "item.started" : phase === "end" ? "item.completed" : "item.updated";
-    const detail = cursorPiSubagentStartupAbort
-      ? PI_CURSOR_SUBAGENT_UNAVAILABLE_ERROR
-      : (detailFromUnknown(item.result) ?? detailFromUnknown(item.partialResult));
+    const detail = detailFromUnknown(item.result) ?? detailFromUnknown(item.partialResult);
     yield* emit({
       ...(yield* makeEventBase({
         threadId: context.threadId,
