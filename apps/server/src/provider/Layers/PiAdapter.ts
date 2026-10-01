@@ -151,7 +151,7 @@ function textValue(value: unknown): string | undefined {
 }
 
 const PI_SKILL_MENTION_PATTERN =
-  /(^|\s)\$(?![0-9][0-9_]*(?:[kKmMbBtT]|[eE][0-9]+)?(?:\s|$))(?=[a-zA-Z0-9:_-]*[a-zA-Z])([a-zA-Z0-9][a-zA-Z0-9:_-]*)(?=\s|$)/g;
+  /(^|\s)\p{Sc}(?![0-9][0-9_]*(?:[kKmMbBtT]|[eE][0-9]+)?(?:\s|$))(?=[a-zA-Z0-9:_-]*[a-zA-Z])([a-zA-Z0-9][a-zA-Z0-9:_-]*)(?=\s|$)/gu;
 
 const PI_TEMPLATE_COMMAND_PATTERN = /^\/([^\s]+)(?:\s+([\s\S]*))?$/;
 
@@ -1297,8 +1297,11 @@ export const makePiAdapter = Effect.fn("makePiAdapter")(function* (
       context.session = { ...context.session, model: requestedSelection.model };
     }
 
+    // Pi ingests images only. Generic files reach the agent through the path
+    // line ProviderService puts in the prompt.
+    const imageAttachments = attachments.filter((attachment) => attachment.type === "image");
     const images =
-      attachments.length === 0
+      imageAttachments.length === 0
         ? []
         : yield* Effect.gen(function* () {
             if (options.attachmentReader === undefined) {
@@ -1320,7 +1323,7 @@ export const makePiAdapter = Effect.fn("makePiAdapter")(function* (
             }
 
             return yield* loadPiImageContents({
-              attachments,
+              attachments: imageAttachments,
               reader: options.attachmentReader,
             }).pipe(
               Effect.mapError(

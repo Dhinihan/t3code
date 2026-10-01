@@ -175,6 +175,15 @@ const imageAttachment = {
   sizeBytes: 3,
 };
 
+// Large pastes arrive as file attachments; their path is already in the prompt.
+const pastedTextAttachment = {
+  type: "file" as const,
+  id: "pi-images-00000000-0000-4000-8000-000000000002",
+  name: "pasted.txt",
+  mimeType: "text/plain",
+  sizeBytes: 3,
+};
+
 const imageReader: PiImageAttachmentReader = {
   attachmentsDir: "/tmp/pi-images",
   readFile: () => Effect.succeed(Uint8Array.from([1, 2, 3])),
@@ -210,8 +219,8 @@ it.effect("expands ordered, repeated, and inline Pi skill mentions", () =>
       yield* adapter.startSession(startInput(threadId));
       yield* adapter.sendTurn({
         threadId,
-        input: "before $beta $alpha $beta $HOME after",
-        attachments: [imageAttachment],
+        input: "before $beta ＄alpha $beta $HOME after",
+        attachments: [imageAttachment, pastedTextAttachment],
       });
 
       assert.deepEqual(sessionDouble.requests, [
@@ -222,7 +231,7 @@ it.effect("expands ordered, repeated, and inline Pi skill mentions", () =>
         {
           type: "prompt",
           message:
-            'before $beta $alpha $beta $HOME after\n\n<skill name="beta" location="/tmp/project/.pi/skills/beta/SKILL.md">\nReferences are relative to /tmp/project/.pi/skills/beta.\n\nBeta body\n</skill>\n\n<skill name="alpha" location="/tmp/project/.pi/skills/alpha/SKILL.md">\nReferences are relative to /tmp/project/.pi/skills/alpha.\n\nAlpha body\n</skill>',
+            'before $beta ＄alpha $beta $HOME after\n\n<skill name="beta" location="/tmp/project/.pi/skills/beta/SKILL.md">\nReferences are relative to /tmp/project/.pi/skills/beta.\n\nBeta body\n</skill>\n\n<skill name="alpha" location="/tmp/project/.pi/skills/alpha/SKILL.md">\nReferences are relative to /tmp/project/.pi/skills/alpha.\n\nAlpha body\n</skill>',
           images: [{ type: "image", data: "AQID", mimeType: "image/png" }],
           streamingBehavior: "steer",
         },
