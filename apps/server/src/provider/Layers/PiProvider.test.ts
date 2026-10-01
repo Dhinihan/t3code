@@ -4,7 +4,11 @@ import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
+import * as Scope from "effect/Scope";
+import * as TestClock from "effect/testing/TestClock";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
@@ -14,6 +18,12 @@ import { assert, describe, it } from "@effect/vitest";
 import {
   buildInitialPiProviderSnapshot,
   checkPiProviderStatus,
+  makePiProviderProbe,
+  PI_CATALOG_PROBE_TIMEOUT_MS,
+  PI_SCOPED_MODELS_TIMEOUT_MS,
+  PI_VERSION_PROBE_TIMEOUT_MS,
+  probePiSkillsForCwd,
+  PiProviderProbeDependencyError,
   PI_SCOPED_MODELS_EXTENSION_PATH,
   isPiModelSelectionStale,
   mapPiModelToServerModel,
@@ -25,6 +35,7 @@ import {
   type PiScopedModelDescriptor,
 } from "./PiProvider.ts";
 import { connectPiRpc } from "./PiRpcConnection.ts";
+import type { PiRpcEvent, PiRpcResponse } from "./PiRpcContract.ts";
 import {
   PI_SCOPED_MODELS_STATUS_PREFIX,
   makePiScopedModelsStatusKey,
@@ -81,7 +92,7 @@ const stateResponse = {
   command: "get_state",
   success: true,
   data: { sessionId: "sess-1" },
-};
+} satisfies PiRpcResponse;
 
 const availableResponse = (models: ReadonlyArray<PiModelDescriptor>) => ({
   type: "response",
@@ -419,3 +430,222 @@ for (const stderr of ["  version command failed  ", ""]) {
     }).pipe(Effect.provide(NodeServices.layer)),
   );
 }
+
+const catalogConnection = Effect.gen(function* () {
+  const status = yield* Deferred.make<PiRpcEvent>();
+  return {
+    ...connection({ responses: [stateResponse], events: [] }),
+    events: Stream.fromEffect(Deferred.await(status)),
+    request: (command, id) =>
+      Effect.gen(function* () {
+        if (command.type === "get_state") return stateResponse;
+        if (command.type === "prompt") {
+          const token = command.message.split(" ").at(-1) ?? "";
+          yield* Deferred.succeed(status, {
+            type: "extension_ui_request",
+            method: "setStatus",
+            statusKey: makePiScopedModelsStatusKey(token),
+            statusText: encodeJson({ version: 1, models: [{ model: model() }] }),
+          });
+        }
+        return { type: "response", id, command: command.type, success: true };
+      }),
+  } satisfies PiRpcProbeConnection;
+});
+
+const temporaryPiBinary = Effect.gen(function* () {
+  const directory = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "pi-version-cache-"));
+  yield* Scope.addFinalizer(
+    yield* Scope.Scope,
+    Effect.sync(() => NodeFS.rmSync(directory, { recursive: true, force: true })),
+  );
+  const binaryPath = NodePath.join(directory, process.platform === "win32" ? "pi.cmd" : "pi");
+  NodeFS.writeFileSync(binaryPath, "initial binary", { mode: 0o755 });
+  return { directory, binaryPath };
+});
+
+it.effect(
+  "shares successful version probes across checks and sessions, invalidating changed binaries",
+  () =>
+    Effect.gen(function* () {
+      const { directory, binaryPath } = yield* temporaryPiBinary;
+      let probes = 0;
+      const probe = yield* makePiProviderProbe(
+        { enabled: true, binaryPath: "pi", environment: { PATH: directory } },
+        {
+          runVersion: () =>
+            Effect.sync(() => ({ stdout: `pi 0.84.${++probes}`, stderr: "", code: 0 })),
+          connect: () => catalogConnection,
+        },
+      );
+      assert.equal((yield* probe.checkStatus).status, "ready");
+      assert.equal((yield* probe.checkStatus).version, "0.84.1");
+      assert.equal(yield* probe.resolveVersionForSession, "0.84.1");
+      assert.equal(probes, 1);
+      NodeFS.appendFileSync(binaryPath, " upgraded");
+      assert.equal((yield* probe.checkStatus).version, "0.84.2");
+      assert.equal(yield* probe.resolveVersionForSession, "0.84.2");
+      assert.equal(probes, 2);
+      const stat = NodeFS.statSync(binaryPath);
+      NodeFS.utimesSync(binaryPath, stat.atimeMs / 1_000, stat.mtimeMs / 1_000 + 10);
+      assert.equal((yield* probe.checkStatus).version, "0.84.3");
+      assert.equal(probes, 3);
+    }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
+);
+
+for (const timeout of ["catalog", "version"] as const) {
+  for (const hadSuccess of [false, true]) {
+    it.effect(
+      `${timeout} timeout ${hadSuccess ? "preserves the last good catalog" : "reports error without a previous catalog"}`,
+      () =>
+        Effect.gen(function* () {
+          const { binaryPath } = yield* temporaryPiBinary;
+          let pending = false;
+          const started = yield* Deferred.make<void>();
+          const hang = Deferred.succeed(started, undefined).pipe(Effect.andThen(Effect.never));
+          const probe = yield* makePiProviderProbe(
+            { enabled: true, binaryPath },
+            {
+              runVersion: () =>
+                pending && timeout === "version"
+                  ? hang
+                  : Effect.succeed({ stdout: "pi 0.84.1", stderr: "", code: 0 }),
+              connect: () => (pending && timeout === "catalog" ? hang : catalogConnection),
+            },
+          );
+          const previous = hadSuccess ? yield* probe.checkStatus : undefined;
+          pending = true;
+          // A changed binary forces another version probe instead of using the cache.
+          if (timeout === "version") NodeFS.appendFileSync(binaryPath, " changed");
+          const fiber = yield* probe.checkStatus.pipe(Effect.forkChild);
+          yield* Deferred.await(started);
+          yield* TestClock.adjust(
+            timeout === "version" ? PI_VERSION_PROBE_TIMEOUT_MS : PI_CATALOG_PROBE_TIMEOUT_MS,
+          );
+          const snapshot = yield* Fiber.join(fiber);
+          assert.equal(snapshot.status, hadSuccess ? "warning" : "error");
+          assert.deepEqual(snapshot.models, previous?.models ?? []);
+          assert.equal(
+            snapshot.version,
+            previous?.version ?? (timeout === "catalog" ? "0.84.1" : null),
+          );
+          assert.include(snapshot.message ?? "", hadSuccess ? "last known models" : "timed out");
+          if (hadSuccess) {
+            pending = false;
+            assert.equal((yield* probe.checkStatus).status, "ready");
+          }
+        }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
+    );
+  }
+}
+
+it.effect("does not reuse the last good catalog for a missing or incompatible binary", () =>
+  Effect.gen(function* () {
+    const { binaryPath } = yield* temporaryPiBinary;
+    let mode: "ready" | "missing" | "incompatible" = "ready";
+    const probe = yield* makePiProviderProbe(
+      { enabled: true, binaryPath },
+      {
+        runVersion: () =>
+          mode === "missing"
+            ? Effect.fail(
+                new PiProviderProbeDependencyError({ detail: "missing", missingCommand: true }),
+              )
+            : Effect.succeed({
+                stdout: mode === "incompatible" ? "pi 0.84.0" : "pi 0.84.1",
+                stderr: "",
+                code: 0,
+              }),
+        connect: () => catalogConnection,
+      },
+    );
+    assert.equal((yield* probe.checkStatus).status, "ready");
+    NodeFS.rmSync(binaryPath);
+    mode = "missing";
+    const missing = yield* probe.checkStatus;
+    assert.equal(missing.status, "error");
+    assert.equal(missing.installed, false);
+    assert.deepEqual(missing.models, []);
+    NodeFS.writeFileSync(binaryPath, "incompatible new binary", { mode: 0o755 });
+    mode = "incompatible";
+    const incompatible = yield* probe.checkStatus;
+    assert.equal(incompatible.status, "error");
+    assert.deepEqual(incompatible.models, []);
+  }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
+);
+
+it.effect("probes skills without loading extensions or the scoped-models bridge", () =>
+  Effect.gen(function* () {
+    const args: Array<ReadonlyArray<string>> = [];
+    const spawner = ChildProcessSpawner.make((command) => {
+      if (command._tag === "StandardCommand") args.push(command.args);
+      return Effect.die("Arguments captured before spawning");
+    });
+    const result = yield* probePiSkillsForCwd({
+      settings: { enabled: true, binaryPath: "pi", extensionPath: "/unused.ts" },
+      cwd: "/repo",
+    }).pipe(Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner), Effect.exit);
+    assert.equal(result._tag, "Failure");
+    assert.deepEqual(args, [["--mode", "rpc", "--approve", "--no-session", "--no-extensions"]]);
+  }).pipe(Effect.scoped),
+);
+
+for (const failure of [
+  { stdout: "not a version", stderr: "", code: 0 },
+  { stdout: "pi 0.84.1", stderr: "failed", code: 1 },
+]) {
+  it.effect(`does not cache an unsuccessful version parse or exit: ${failure.code}`, () =>
+    Effect.gen(function* () {
+      const { binaryPath } = yield* temporaryPiBinary;
+      let probes = 0;
+      const probe = yield* makePiProviderProbe(
+        { enabled: true, binaryPath },
+        {
+          runVersion: () =>
+            Effect.sync(() => {
+              probes += 1;
+              return probes <= 2 ? failure : { stdout: "pi 0.84.1", stderr: "", code: 0 };
+            }),
+          connect: () => catalogConnection,
+        },
+      );
+      assert.equal((yield* probe.checkStatus).status, "error");
+      assert.equal((yield* probe.checkStatus).status, "error");
+      assert.equal((yield* probe.checkStatus).status, "ready");
+      assert.equal((yield* probe.checkStatus).status, "ready");
+      assert.equal(probes, 3);
+    }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
+  );
+}
+
+it.effect("keeps the last good catalog when the scoped-models response times out", () =>
+  Effect.gen(function* () {
+    const { binaryPath } = yield* temporaryPiBinary;
+    const started = yield* Deferred.make<void>();
+    let pending = false;
+    const probe = yield* makePiProviderProbe(
+      { enabled: true, binaryPath },
+      {
+        runVersion: () => Effect.succeed({ stdout: "pi 0.84.1", stderr: "", code: 0 }),
+        connect: () =>
+          pending
+            ? Effect.succeed({
+                ...connection({ responses: [stateResponse], events: [] }),
+                events: Stream.fromEffect(
+                  Deferred.succeed(started, undefined).pipe(Effect.andThen(Effect.never)),
+                ),
+              })
+            : catalogConnection,
+      },
+    );
+    const previous = yield* probe.checkStatus;
+    pending = true;
+    const fiber = yield* probe.checkStatus.pipe(Effect.forkChild);
+    yield* Deferred.await(started);
+    yield* TestClock.adjust(PI_SCOPED_MODELS_TIMEOUT_MS);
+    const snapshot = yield* Fiber.join(fiber);
+    assert.equal(snapshot.status, "warning");
+    assert.deepEqual(snapshot.models, previous.models);
+    assert.equal(snapshot.version, previous.version);
+  }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
+);

@@ -1,5 +1,6 @@
 // @effect-diagnostics nodeBuiltinImport:off
 import * as NodeCrypto from "node:crypto";
+import * as NodePath from "node:path";
 
 import * as Cause from "effect/Cause";
 import * as Data from "effect/Data";
@@ -7,9 +8,12 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
+import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
+import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
+import * as Semaphore from "effect/Semaphore";
 import * as Stream from "effect/Stream";
 import * as ChildProcess from "effect/unstable/process/ChildProcess";
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
@@ -22,7 +26,7 @@ import {
 } from "@t3tools/contracts";
 import { HostProcessPlatform } from "@t3tools/shared/hostProcess";
 import { createModelCapabilities } from "@t3tools/shared/model";
-import { resolveSpawnCommand } from "@t3tools/shared/shell";
+import { resolveSpawnCommand, SpawnExecutableResolution } from "@t3tools/shared/shell";
 
 import {
   buildServerProvider,
@@ -41,7 +45,7 @@ import {
   type PiRpcResponse,
   type PiRpcSkill,
 } from "./PiRpcContract.ts";
-import type * as PiRpcErrors from "./PiRpcErrors.ts";
+import * as PiRpcErrors from "./PiRpcErrors.ts";
 import {
   makePiScopedModelsStatusKey,
   PI_SCOPED_MODELS_COMMAND,
@@ -52,10 +56,10 @@ export const PI_PROVIDER_BINARY = "pi";
 export const PI_SCOPED_MODELS_EXTENSION_PATH = resolvePiExtensionAssetPath(
   "PiScopedModelsExtension.ts",
 );
-export const PI_VERSION_PROBE_TIMEOUT_MS = 4_000;
-export const PI_CATALOG_PROBE_TIMEOUT_MS = 10_000;
+export const PI_VERSION_PROBE_TIMEOUT_MS = 15_000;
+export const PI_CATALOG_PROBE_TIMEOUT_MS = 30_000;
 export const PI_SCOPED_MODELS_TIMEOUT_MS = 4_000;
-export const PI_SKILLS_PROBE_TIMEOUT_MS = 4_000;
+export const PI_SKILLS_PROBE_TIMEOUT_MS = 15_000;
 const PI_UNRESOLVED_VERSION = "unknown";
 
 const PI_PRESENTATION = {
@@ -110,6 +114,7 @@ export interface PiProviderCatalog {
 export class PiProviderCatalogError extends Data.TaggedError("PiProviderCatalogError")<{
   readonly operation: string;
   readonly detail: string;
+  readonly timedOut?: boolean;
 }> {}
 
 export class PiProviderProbeDependencyError extends Data.TaggedError(
@@ -361,6 +366,7 @@ export const readPiModelCatalog = Effect.fn("readPiModelCatalog")(function* (inp
     return yield* new PiProviderCatalogError({
       operation: "scoped_models",
       detail: "Pi scoped-models extension did not return a response.",
+      timedOut: Option.isNone(scopedEventResult),
     });
   }
 
@@ -457,19 +463,14 @@ function runPiVersionCommand(settings: PiProviderSettings) {
   );
 }
 
-/**
- * Read the version used by the session handshake while materializing a
- * provider instance. A failed eager probe uses an intentionally incompatible
- * sentinel; the managed snapshot probe still reports the concrete failure,
- * while a session cannot proceed until a real compatible version is known.
- */
+/** Resolve the version for each new session process; failed probes remain retryable. */
 export const resolvePiVersionForSession = Effect.fn("resolvePiVersionForSession")(function* (
   settings: PiProviderSettings,
+  dependencies: PiProviderProbeDependencies = {},
 ): Effect.fn.Return<string, never, ChildProcessSpawner.ChildProcessSpawner> {
-  const versionResult = yield* runPiVersionCommand(settings).pipe(
-    Effect.timeoutOption(PI_VERSION_PROBE_TIMEOUT_MS),
-    Effect.result,
-  );
+  const versionResult = yield* (
+    dependencies.runVersion?.(settings) ?? runPiVersionCommand(settings)
+  ).pipe(Effect.timeoutOption(PI_VERSION_PROBE_TIMEOUT_MS), Effect.result);
   if (versionResult._tag === "Failure" || Option.isNone(versionResult.success)) {
     return PI_UNRESOLVED_VERSION;
   }
@@ -477,6 +478,63 @@ export const resolvePiVersionForSession = Effect.fn("resolvePiVersionForSession"
   const output = versionResult.success.value;
   const version = parseGenericCliVersion(`${output.stdout}\n${output.stderr}`);
   return output.code === 0 && version !== null ? version : PI_UNRESOLVED_VERSION;
+});
+
+/** Share successful version probes and the last good catalog within one Pi instance. */
+export const makePiProviderProbe = Effect.fn("makePiProviderProbe")(function* (
+  settings: PiProviderSettings,
+  dependencies: PiProviderProbeDependencies = {},
+) {
+  const fileSystem = yield* FileSystem.FileSystem;
+  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+  const resolveExecutable = yield* SpawnExecutableResolution;
+  const versionLock = yield* Semaphore.make(1);
+  const versions = new Map<string, CommandResult>();
+  const lastGood = yield* Ref.make<ServerProviderDraft | undefined>(undefined);
+  const runVersion = Effect.fn("PiProvider.runVersion")(
+    function* (input: PiProviderSettings) {
+      const binary = input.binaryPath.trim() || PI_PROVIDER_BINARY;
+      const executable = resolveExecutable(
+        binary.includes("/") || binary.includes("\\")
+          ? NodePath.resolve(input.cwd ?? process.cwd(), binary)
+          : binary,
+        process.platform,
+        input.environment ?? process.env,
+      );
+      const identity =
+        executable === undefined
+          ? undefined
+          : yield* Effect.gen(function* () {
+              const path = yield* fileSystem.realPath(executable);
+              const stat = yield* fileSystem.stat(path);
+              return `${path}:${Option.getOrNull(stat.mtime)?.getTime()}:${stat.size}`;
+            }).pipe(Effect.catch(() => Effect.succeed(undefined)));
+      const cached = identity === undefined ? undefined : versions.get(identity);
+      if (cached !== undefined) return cached;
+      const output = yield* dependencies.runVersion?.(input) ?? runPiVersionCommand(input);
+      if (
+        identity !== undefined &&
+        output.code === 0 &&
+        parseGenericCliVersion(`${output.stdout}\n${output.stderr}`) !== null
+      ) {
+        versions.set(identity, output);
+      }
+      return output;
+    },
+    (effect) =>
+      versionLock
+        .withPermit(effect)
+        .pipe(Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner)),
+  );
+  const cachedDependencies = { ...dependencies, runVersion };
+  return {
+    checkStatus: checkPiProviderStatus(settings, cachedDependencies, lastGood).pipe(
+      Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
+    ),
+    resolveVersionForSession: resolvePiVersionForSession(settings, cachedDependencies).pipe(
+      Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
+    ),
+  };
 });
 
 function connectPiProbe(settings: PiProviderSettings, cwd = settings.cwd ?? process.cwd()) {
@@ -508,7 +566,15 @@ export const probePiSkillsForCwd = Effect.fn("probePiSkillsForCwd")(function* (i
   PiRpcErrors.PiRpcError | PiProviderCatalogError,
   Scope.Scope | ChildProcessSpawner.ChildProcessSpawner
 > {
-  const connection = yield* connectPiProbe(input.settings, input.cwd);
+  // Extension-contributed skill paths from resources_discover are not visible here.
+  const connection = yield* connectPiRpc({
+    binaryPath: input.settings.binaryPath.trim() || PI_PROVIDER_BINARY,
+    cwd: input.cwd,
+    args: ["--mode", "rpc", "--approve", "--no-session", "--no-extensions"],
+    ...(input.settings.environment !== undefined
+      ? { environment: input.settings.environment }
+      : {}),
+  });
   return yield* readPiSkills({ connection }).pipe(Effect.ensuring(connection.close));
 });
 
@@ -552,8 +618,22 @@ function errorMessage(error: unknown): string {
 export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function* (
   settings: PiProviderSettings,
   dependencies: PiProviderProbeDependencies = {},
+  lastGood?: Ref.Ref<ServerProviderDraft | undefined>,
 ): Effect.fn.Return<ServerProviderDraft, never, ChildProcessSpawner.ChildProcessSpawner> {
   const checkedAt = DateTime.formatIso(yield* DateTime.now);
+  const timedOutSnapshot = Effect.fnUntraced(function* (version: string | null, message: string) {
+    const previous = lastGood === undefined ? undefined : yield* Ref.get(lastGood);
+    return providerSnapshot({
+      settings,
+      checkedAt,
+      models: previous?.models ?? [],
+      installed: true,
+      version: version ?? previous?.version ?? null,
+      status: previous === undefined ? "error" : "warning",
+      message:
+        previous === undefined ? message : "Pi refresh timed out; showing the last known models.",
+    });
+  });
   if (!settings.enabled) {
     return providerSnapshot({
       settings,
@@ -592,15 +672,10 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
     });
   }
   if (Option.isNone(versionResult.success)) {
-    return providerSnapshot({
-      settings,
-      checkedAt,
-      models: [],
-      installed: true,
-      version: null,
-      status: "error",
-      message: "Pi CLI is installed but timed out while running `pi --version`.",
-    });
+    return yield* timedOutSnapshot(
+      null,
+      "Pi CLI is installed but timed out while running `pi --version`.",
+    );
   }
 
   const versionOutput = versionResult.success.value;
@@ -638,6 +713,14 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
   );
 
   if (catalogExit._tag === "Failure") {
+    const error = Cause.squash(catalogExit.cause);
+    const message = `Pi provider probe failed: ${errorMessage(error)}`;
+    if (
+      Schema.is(PiRpcErrors.PiRpcRequestTimeoutError)(error) ||
+      (error instanceof PiProviderCatalogError && error.timedOut)
+    ) {
+      return yield* timedOutSnapshot(version, message);
+    }
     return providerSnapshot({
       settings,
       checkedAt,
@@ -645,23 +728,18 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
       installed: true,
       version,
       status: "error",
-      message: `Pi provider probe failed: ${errorMessage(Cause.squash(catalogExit.cause))}`,
+      message,
     });
   }
   if (Option.isNone(catalogExit.value)) {
-    return providerSnapshot({
-      settings,
-      checkedAt,
-      models: [],
-      installed: true,
+    return yield* timedOutSnapshot(
       version,
-      status: "error",
-      message: `Pi provider probe timed out after ${PI_CATALOG_PROBE_TIMEOUT_MS}ms.`,
-    });
+      `Pi provider probe timed out after ${PI_CATALOG_PROBE_TIMEOUT_MS}ms.`,
+    );
   }
 
   const catalog = catalogExit.value.value;
-  return providerSnapshot({
+  const snapshot = providerSnapshot({
     settings,
     checkedAt,
     models: catalog.models,
@@ -672,6 +750,8 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
       ? {}
       : { message: "Pi is available, but it did not report any models." }),
   });
+  if (lastGood !== undefined && catalog.models.length > 0) yield* Ref.set(lastGood, snapshot);
+  return snapshot;
 });
 
 export function buildInitialPiProviderSnapshot(

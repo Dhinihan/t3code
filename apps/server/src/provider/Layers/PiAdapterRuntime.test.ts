@@ -57,7 +57,7 @@ it.live("sends the Pi image content shape across the headless JSONL boundary", (
         binaryPath: process.execPath,
         cwd: process.cwd(),
         sessionDir,
-        piVersion: "0.84.1",
+        resolveVersion: Effect.succeed("0.84.1"),
         args: [PEER_PATH],
         environment: {
           ...process.env,

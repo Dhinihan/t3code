@@ -11,6 +11,8 @@ import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
+import * as TestClock from "effect/testing/TestClock";
+import { makePiProviderProbe, PI_VERSION_PROBE_TIMEOUT_MS } from "./PiProvider.ts";
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
 
 import { connectPiRpc, type PiRpcConnection } from "./PiRpcConnection.ts";
@@ -110,7 +112,7 @@ it.effect("handshakes once and reuses the active process for a thread", () =>
         binaryPath: "pi",
         cwd: "/repo",
         sessionDir,
-        piVersion: "0.84.1",
+        resolveVersion: Effect.succeed("0.84.1"),
         connect: fake.connect,
       });
 
@@ -177,7 +179,7 @@ it.effect("gives only the main Pi process an ephemeral T3 MCP extension", () =>
           binaryPath: "pi",
           cwd: "/repo",
           sessionDir,
-          piVersion: "0.84.1",
+          resolveVersion: Effect.succeed("0.84.1"),
           args: ["--extension", "/home/user/.pi/agent/extensions/personal.ts"],
           connect: fake.connect,
           revokeMcpProviderSession: (providerSessionId) =>
@@ -251,7 +253,7 @@ it.effect("revokes and removes the Pi MCP lease after an unexpected process exit
           binaryPath: "pi",
           cwd: "/repo",
           sessionDir,
-          piVersion: "0.84.1",
+          resolveVersion: Effect.succeed("0.84.1"),
           connect: fake.connect,
           revokeMcpProviderSession: (providerSessionId) =>
             Effect.gen(function* () {
@@ -308,7 +310,7 @@ it.effect("closes the child scope when the Pi handshake is incompatible", () =>
         binaryPath: "pi",
         cwd: "/repo",
         sessionDir,
-        piVersion: "0.84.0",
+        resolveVersion: Effect.succeed("0.84.0"),
         connect: fake.connect,
       });
 
@@ -340,7 +342,7 @@ it.effect("resumes the same persisted session after the manager is rebuilt", () 
         binaryPath: "pi",
         cwd: "/repo",
         sessionDir,
-        piVersion: "0.84.1",
+        resolveVersion: Effect.succeed("0.84.1"),
         connect: firstFake.connect,
       });
       const first = yield* firstManager.start({ threadId });
@@ -354,7 +356,7 @@ it.effect("resumes the same persisted session after the manager is rebuilt", () 
         binaryPath: "pi",
         cwd: "/repo",
         sessionDir,
-        piVersion: "0.84.1",
+        resolveVersion: Effect.succeed("0.84.1"),
         connect: secondFake.connect,
       });
       const resumed = yield* secondManager.start({ threadId, resumeCursor: cursor });
@@ -380,7 +382,7 @@ it.effect("refuses a resume cursor whose persisted history disappeared", () =>
         binaryPath: "pi",
         cwd: "/repo",
         sessionDir,
-        piVersion: "0.84.1",
+        resolveVersion: Effect.succeed("0.84.1"),
         connect: fake.connect,
       });
       const cursor = {
@@ -421,7 +423,7 @@ it.effect("drops a crashed process from the active thread map", () =>
         binaryPath: "pi",
         cwd: "/repo",
         sessionDir,
-        piVersion: "0.84.1",
+        resolveVersion: Effect.succeed("0.84.1"),
         connect: fake.connect,
       });
       yield* manager.start({ threadId });
@@ -459,7 +461,7 @@ it.live("reuses the lifecycle seam against the real hermetic Pi peer", () =>
         binaryPath: process.execPath,
         cwd: process.cwd(),
         sessionDir,
-        piVersion: "0.84.1",
+        resolveVersion: Effect.succeed("0.84.1"),
         args: [PEER_PATH],
         environment: {
           ...process.env,
@@ -484,6 +486,67 @@ it.live("reuses the lifecycle seam against the real hermetic Pi peer", () =>
       yield* manager.stop(threadId);
       NodeFS.rmSync(scriptPath, { force: true });
       NodeFS.rmSync(sessionDir, { recursive: true, force: true });
+    }),
+  ),
+);
+
+it.effect("starts a session after an initial version timeout and a later successful probe", () =>
+  run(
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("version-recovery");
+      const sessionDir = NodeFS.mkdtempSync(
+        NodePath.join(NodeOS.tmpdir(), "pi-session-version-recovery-"),
+      );
+      yield* Scope.addFinalizer(
+        yield* Scope.Scope,
+        Effect.sync(() => NodeFS.rmSync(sessionDir, { recursive: true, force: true })),
+      );
+      let versionProbes = 0;
+      const started = yield* Deferred.make<void>();
+      const probe = yield* makePiProviderProbe(
+        { enabled: true, binaryPath: process.execPath },
+        {
+          runVersion: () =>
+            Effect.gen(function* () {
+              versionProbes += 1;
+              if (versionProbes === 1) {
+                yield* Deferred.succeed(started, undefined);
+                return yield* Effect.never;
+              }
+              return { stdout: "pi 0.84.1", stderr: "", code: 0 };
+            }),
+        },
+      );
+      const fake = makeFakeConnector({
+        states: [
+          makeState({
+            sessionId: piSessionIdForThread(threadId),
+            sessionFile: NodePath.join(sessionDir, "session.jsonl"),
+          }),
+          makeState({
+            sessionId: piSessionIdForThread(threadId),
+            sessionFile: NodePath.join(sessionDir, "session.jsonl"),
+          }),
+        ],
+      });
+      const manager = yield* makePiSessionManager({
+        binaryPath: "pi",
+        cwd: "/repo",
+        sessionDir,
+        resolveVersion: probe.resolveVersionForSession,
+        connect: fake.connect,
+      });
+      const first = yield* manager.start({ threadId }).pipe(Effect.result, Effect.forkChild);
+      yield* Deferred.await(started);
+      yield* TestClock.adjust(PI_VERSION_PROBE_TIMEOUT_MS);
+      const failed = yield* Fiber.join(first);
+      assert.equal(failed._tag, "Failure");
+      if (failed._tag === "Failure") assert.include(failed.failure.message, "Pi unknown");
+      assert.equal(yield* manager.has(threadId), false);
+      const session = yield* manager.start({ threadId });
+      assert.equal((yield* session.getResumeCursor()).piVersion, "0.84.1");
+      assert.equal(versionProbes, 2);
+      assert.equal(fake.connections[0]?.closeCalls.length, 1);
     }),
   ),
 );

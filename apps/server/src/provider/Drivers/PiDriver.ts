@@ -22,15 +22,13 @@ import { ServerConfig } from "../../config.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
 import { makePiTextGeneration } from "../../textGeneration/PiTextGeneration.ts";
 import { ProviderDriverError } from "../Errors.ts";
-import { MINIMUM_PI_VERSION } from "../Layers/PiCompatibility.ts";
 import {
   buildInitialPiProviderSnapshot,
-  checkPiProviderStatus,
+  makePiProviderProbe,
   PI_PROVIDER_BINARY,
   PI_SCOPED_MODELS_EXTENSION_PATH,
   PI_SKILLS_PROBE_TIMEOUT_MS,
   probePiSkillsForCwd,
-  resolvePiVersionForSession,
   type PiProviderSettings,
 } from "../Layers/PiProvider.ts";
 import { makePiAdapter } from "../Layers/PiAdapter.ts";
@@ -143,9 +141,7 @@ export const PiDriver: ProviderDriver<PiDriverConfig, PiDriverEnv> = {
         continuationGroupKey: continuationIdentity.continuationKey,
       });
       const sessionDir = piSessionDirectory(serverConfig.stateDir, instanceId);
-      const piVersion = enabled
-        ? yield* resolvePiVersionForSession(providerSettings)
-        : MINIMUM_PI_VERSION;
+      const probe = yield* makePiProviderProbe(providerSettings);
 
       yield* fileSystem.makeDirectory(sessionDir, { recursive: true }).pipe(
         Effect.mapError((cause) =>
@@ -161,10 +157,7 @@ export const PiDriver: ProviderDriver<PiDriverConfig, PiDriverEnv> = {
         binaryPath,
         cwd: serverConfig.cwd,
         sessionDir,
-        // The provider probe reads the version before the manager is exposed;
-        // the process handshake still validates get_state and the shared
-        // compatibility floor before its first prompt.
-        piVersion,
+        resolveVersion: probe.resolveVersionForSession,
         environment: processEnv,
         revokeMcpProviderSession: McpSessionRegistry.revokeActiveMcpProviderSession,
       }).pipe(
@@ -197,7 +190,7 @@ export const PiDriver: ProviderDriver<PiDriverConfig, PiDriverEnv> = {
       });
       const textGeneration = yield* makePiTextGeneration();
       const snapshotSettings = makeProviderSnapshotSettingsSource(providerSettings, serverSettings);
-      const checkProvider = checkPiProviderStatus(providerSettings).pipe(
+      const checkProvider = probe.checkStatus.pipe(
         Effect.map(stampIdentity),
         Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, childProcessSpawner),
         Effect.provideService(HostProcessPlatform, process.platform),

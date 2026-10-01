@@ -65,8 +65,8 @@ export interface PiSessionManagerOptions {
   readonly binaryPath: string;
   readonly cwd: string;
   readonly sessionDir: string;
-  /** Version read by the provider probe before this manager is created. */
-  readonly piVersion: string;
+  /** Resolve the current binary version when a session process starts. */
+  readonly resolveVersion: Effect.Effect<string>;
   /** Extra CLI flags such as `--extension`; session flags are appended here. */
   readonly args?: ReadonlyArray<string>;
   readonly environment?: NodeJS.ProcessEnv;
@@ -189,6 +189,7 @@ const makePiSessionManager = Effect.fn("makePiSessionManager")(function* (
     threadId: ThreadId,
     connection: PiRpcConnection,
     expectedSessionId: string,
+    piVersion: string,
   ): Effect.fn.Return<PiRpcGetStateResponse, PiSessionManagerError> {
     const requestId = yield* nextRequestId(threadId, "get_state");
     const response = yield* connection.request({ type: "get_state" }, requestId);
@@ -196,13 +197,13 @@ const makePiSessionManager = Effect.fn("makePiSessionManager")(function* (
     if (Option.isNone(decoded)) {
       return yield* new PiRpcErrors.PiRpcCompatibilityError({
         operation: "get_state",
-        piVersion: options.piVersion,
+        piVersion,
         missingRequirement: "data.sessionId",
       });
     }
 
     const compatibility = PiCompatibility.assessPiCompatibility({
-      version: options.piVersion,
+      version: piVersion,
       state: decoded.value,
     });
     if (Result.isFailure(compatibility)) {
@@ -310,6 +311,7 @@ const makePiSessionManager = Effect.fn("makePiSessionManager")(function* (
     readonly cwd: string;
     readonly previous: PiResumeCursor | undefined;
     readonly state: PiRpcGetStateResponse;
+    readonly piVersion: string;
   }): Effect.Effect<PiResumeCursor, PiSessionManagerError> => {
     const stateFile = stateSessionFile(input.state);
     if (stateFile !== undefined && !isWithinDirectory(sessionDir, stateFile)) {
@@ -343,7 +345,7 @@ const makePiSessionManager = Effect.fn("makePiSessionManager")(function* (
       sessionDir,
       ...(sessionFile === undefined ? {} : { sessionFile }),
       cwd: input.cwd,
-      piVersion: options.piVersion,
+      piVersion: input.piVersion,
       ...(stateMessageCount(input.state) === undefined
         ? input.previous?.messageCount === undefined
           ? {}
@@ -380,12 +382,18 @@ const makePiSessionManager = Effect.fn("makePiSessionManager")(function* (
       });
     }
     const previous = yield* Ref.get(context.cursor);
-    const state = yield* readState(context.threadId, context.connection, context.handle.sessionId);
+    const state = yield* readState(
+      context.threadId,
+      context.connection,
+      context.handle.sessionId,
+      previous.piVersion,
+    );
     const next = yield* makeCursor({
       threadId: context.threadId,
       cwd: previous.cwd,
       previous,
       state,
+      piVersion: previous.piVersion,
     });
     yield* Ref.set(context.cursor, next);
     return next;
@@ -413,6 +421,7 @@ const makePiSessionManager = Effect.fn("makePiSessionManager")(function* (
 
     const sessionScope = yield* Scope.make("sequential");
     const started = Effect.gen(function* () {
+      const piVersion = yield* options.resolveVersion;
       const mcpLease = mcpProviderSession
         ? yield* (
             options.revokeMcpProviderSession === undefined
@@ -446,12 +455,13 @@ const makePiSessionManager = Effect.fn("makePiSessionManager")(function* (
         Effect.provideService(Scope.Scope, sessionScope),
         Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, childProcessSpawner),
       );
-      const state = yield* readState(input.threadId, connection, expectedSessionId);
+      const state = yield* readState(input.threadId, connection, expectedSessionId, piVersion);
       const cursor = yield* makeCursor({
         threadId: input.threadId,
         cwd,
         previous: resumeCursor,
         state,
+        piVersion,
       });
       const closed = yield* Ref.make(false);
       const cursorRef = yield* Ref.make(cursor);
