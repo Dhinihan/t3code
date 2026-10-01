@@ -28,6 +28,9 @@ const Session = Schema.Struct({
   origin: Schema.Literals(["model", "btw"]),
   title: Text,
   model: Schema.NullOr(Text),
+  backend: Schema.optional(Schema.Literals(["pi", "claude", "codex", "cursor"])),
+  effort: Schema.optional(Text),
+  preview: Schema.optional(Text),
   status: Schema.Literals(["running", "done", "error"]),
   terminalReason: Schema.NullOr(Schema.Literals(["completed", "failed", "cancelled"])),
   cumulative: Schema.Struct({ tokens: Schema.NullOr(Count) }),
@@ -119,6 +122,8 @@ export function makePiSubagentEvents({ runtimeId }: { readonly runtimeId: string
         agentKind: "agent",
         title: session.title,
         ...(session.model === null ? {} : { model: session.model }),
+        ...(session.backend === undefined ? {} : { role: session.backend }),
+        ...(session.effort === undefined ? {} : { effort: session.effort }),
         ...(launch === undefined ? {} : { toolUseId: launch.toolUseId }),
       };
       const activeTool = session.tools.activities.findLast((tool) => tool.state === "running");
@@ -140,7 +145,7 @@ export function makePiSubagentEvents({ runtimeId }: { readonly runtimeId: string
             : session.status === "done"
               ? "completed"
               : "failed";
-      const projection = JSON.stringify([linkage, status, summary, typedUsage]);
+      const projection = JSON.stringify([linkage, status, summary, typedUsage, session.preview]);
       const state: State = {
         taskId: previous?.taskId ?? RuntimeTaskId.make(`pi:${runtimeId}:${session.id}`),
         turnId: previous ? previous.turnId : (launch?.turnId ?? turnId),
@@ -171,7 +176,12 @@ export function makePiSubagentEvents({ runtimeId }: { readonly runtimeId: string
         updates.push({
           type: "task.completed",
           turnId: state.turnId,
-          payload: { ...base, status: status === "cancelled" ? "stopped" : status, typedUsage },
+          payload: {
+            ...base,
+            status: status === "cancelled" ? "stopped" : status,
+            ...(session.preview === undefined ? {} : { summary: session.preview }),
+            typedUsage,
+          },
         });
       }
     }

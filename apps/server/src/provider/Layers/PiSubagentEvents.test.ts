@@ -21,7 +21,6 @@ const session = (overrides: Record<string, unknown> = {}) => ({
   id: "sa-1",
   origin: "model",
   title: "Research",
-  backend: "pi",
   model: "model-1",
   status: "running",
   terminalReason: null,
@@ -52,13 +51,17 @@ const event = (sessions: readonly unknown[], sequence = 1): PiRpcEvent => {
 };
 
 describe("PiSubagentEvents", () => {
-  it("starts, deduplicates churn, and completes with cumulative usage", () => {
+  it("accepts old-format snapshots, deduplicates churn, and completes with cumulative usage", () => {
     const events = makePiSubagentEvents({ runtimeId: "runtime-a" });
     const first = events.accept({ event: event([session()]), turnId: TurnId.make("turn-a") });
     assert.deepEqual(
       first.map((item) => item.type),
       ["task.started", "task.progress"],
     );
+    for (const update of first) {
+      assert.isUndefined(update.payload.role);
+      assert.isUndefined(update.payload.effort);
+    }
     assert.equal(events.accept({ event: event([session({ updatedAt: 999 })], 2) }).length, 0);
     const terminal = events.accept({
       event: event(
@@ -83,8 +86,87 @@ describe("PiSubagentEvents", () => {
     assert.equal(terminal.at(-1)?.type, "task.completed");
     const completed = terminal.find((item) => item.type === "task.completed");
     assert.equal(completed?.payload.typedUsage?.totalTokens, 10);
+    assert.isUndefined(completed?.payload.summary);
     assert.equal(events.hasLiveTasks(), false);
   });
+
+  it("carries backend and effort on starts and progress, including metadata-only changes", () => {
+    const events = makePiSubagentEvents({ runtimeId: "metadata" });
+    const first = events.accept({ event: event([session({ backend: "claude", effort: "high" })]) });
+    assert.deepEqual(
+      first.map((update) => update.type),
+      ["task.started", "task.progress"],
+    );
+    for (const update of first) {
+      assert.equal(update.payload.role, "claude");
+      assert.equal(update.payload.effort, "high");
+    }
+    const backendChanged = events.accept({
+      event: event([session({ backend: "codex", effort: "high" })], 2),
+    });
+    assert.equal(backendChanged.length, 1);
+    assert.equal(backendChanged[0]?.type, "task.progress");
+    assert.equal(backendChanged[0]?.payload.role, "codex");
+    assert.equal(backendChanged[0]?.payload.effort, "high");
+    const effortChanged = events.accept({
+      event: event([session({ backend: "codex", effort: "low" })], 3),
+    });
+    assert.equal(effortChanged.length, 1);
+    assert.equal(effortChanged[0]?.type, "task.progress");
+    assert.equal(effortChanged[0]?.payload.role, "codex");
+    assert.equal(effortChanged[0]?.payload.effort, "low");
+  });
+
+  it.each([
+    { status: "done", terminalReason: "completed", preview: "Found the answer", field: "result" },
+    {
+      status: "error",
+      terminalReason: "failed",
+      preview: "Could not read the file",
+      field: "error",
+    },
+  ] as const)(
+    "carries $status preview through completion and ingestion into agent.$field",
+    (testCase) => {
+      const events = makePiSubagentEvents({ runtimeId: "preview" });
+      const terminal = session({
+        status: testCase.status,
+        terminalReason: testCase.terminalReason,
+      });
+      const first = events.accept({ event: event([terminal]) });
+      const enriched = events.accept({
+        event: event([{ ...terminal, preview: testCase.preview }], 2),
+      });
+      assert.deepEqual(
+        enriched.map((update) => update.type),
+        ["task.updated", "task.completed"],
+      );
+      const completed = enriched.find((update) => update.type === "task.completed");
+      assert.equal(completed?.payload.summary, testCase.preview);
+      assert.equal(completed?.payload.status, testCase.status === "done" ? "completed" : "failed");
+      assert.deepEqual(
+        events.accept({ event: event([{ ...terminal, preview: testCase.preview }], 3) }),
+        [],
+      );
+      const decode = Schema.decodeUnknownSync(ProviderRuntimeEvent);
+      const activities = [...first, ...enriched].flatMap((update, index) =>
+        runtimeEventToActivities(
+          decode({
+            ...update,
+            eventId: EventId.make(`preview-${index}`),
+            threadId: ThreadId.make("thread"),
+            provider: ProviderDriverKind.make("pi"),
+            providerInstanceId: ProviderInstanceId.make("pi"),
+            createdAt: "2026-09-11T10:00:00.000Z",
+          }),
+        ),
+      );
+      const panel = deriveAgentPanelModel({ agents: foldSubagentActivities(activities) });
+      assert.equal(panel.directAgents.length, 1);
+      assert.equal(panel.directAgents[0]?.[testCase.field], testCase.preview);
+      assert.isNull(panel.directAgents[0]?.[testCase.field === "result" ? "error" : "result"]);
+    },
+  );
 
   it("keeps runtime identity and original turn through reactivation", () => {
     const events = makePiSubagentEvents({ runtimeId: "runtime-b" });
