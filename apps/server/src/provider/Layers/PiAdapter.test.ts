@@ -1308,6 +1308,7 @@ it.effect("maps abort to turn.aborted and exposes unsupported Pi operations as t
 
       const rollback = yield* adapter.rollbackThread(threadId, 1).pipe(Effect.exit);
       assert.equal(rollback._tag, "Failure");
+      assert.isFalse(adapter.capabilities.supportsConversationRollback);
     }),
   ),
 );

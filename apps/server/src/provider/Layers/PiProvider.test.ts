@@ -378,6 +378,7 @@ it.live("runs the disposable snapshot probe through the hermetic Pi peer", () =>
 
       assert.equal(snapshot.status, "ready", snapshot.message);
       assert.equal(snapshot.version, "0.84.1");
+      assert.equal(snapshot.supportsConversationRollback, false);
       assert.equal(snapshot.models[0]?.slug, "openai-codex/gpt-5.6-luna");
       assert.equal(snapshot.models[0]?.capabilities?.optionDescriptors?.[0]?.currentValue, "xhigh");
 

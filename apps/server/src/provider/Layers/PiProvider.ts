@@ -60,6 +60,7 @@ const PI_UNRESOLVED_VERSION = "unknown";
 
 const PI_PRESENTATION = {
   displayName: "Pi",
+  supportsConversationRollback: false,
   showInteractionModeToggle: false,
   requiresNewThreadForModelChange: false,
 } as const;
